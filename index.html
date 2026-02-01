@@ -6,11 +6,12 @@
     <title>Teacher's Log Pro</title>
     
     <!-- 
-      【Teacher's Log Pro v4.4 (Fix Display Issue)】
+      【Teacher's Log Pro v4.8 (Complete Build)】
       
       [修正内容]
-      - HTMLファイルの構造を修正し、表示崩れの原因となっていた不要なタグを除去しました。
-      - 集計フィルター機能（v4.3）を含んだ正常版です。
+      - v4.7で欠落していた「MonthView（月表示）」コンポーネントを復元・統合しました。
+      - コードの欠損による「MonthView is not defined」エラーを解消。
+      - これにより、週表示・月表示・履歴・集計の全機能が正常に動作します。
     -->
 
     <!-- React & ReactDOM -->
@@ -114,6 +115,8 @@
                     firebase.initializeApp(activeConfig);
                 }
                 db = firebase.firestore();
+                // 接続安定化のための設定
+                db.settings({ experimentalForceLongPolling: true });
                 auth = firebase.auth();
             } catch (e) {
                 console.error("Firebase init error:", e);
@@ -122,7 +125,7 @@
 
         const { useState, useEffect, useMemo, useCallback, useRef } = React;
 
-        const APP_VERSION = "v4.4";
+        const APP_VERSION = "v4.8";
         const WEEK_DAYS = ['月', '火', '水', '木', '金', '土'];
         
         const COLOR_PALETTE = {
@@ -766,6 +769,103 @@
             );
         };
 
+        const MonthView = ({ currentDate, data, onNavigateToWeek, classList }) => {
+            const year = currentDate.getFullYear();
+            const month = currentDate.getMonth();
+            const firstDay = new Date(year, month, 1);
+            const startingDay = firstDay.getDay(); 
+            const diff = startingDay === 0 ? 6 : startingDay - 1;
+            const daysInMonth = new Date(year, month + 1, 0).getDate();
+            
+            const grid = [];
+            let dayCounter = 1;
+            for (let i = 0; i < 6; i++) {
+                const row = [];
+                for (let j = 0; j < 7; j++) {
+                    if (i === 0 && j < diff) {
+                        row.push(null);
+                    } else if (dayCounter > daysInMonth) {
+                        row.push(null);
+                    } else {
+                        row.push(new Date(year, month, dayCounter));
+                        dayCounter++;
+                    }
+                }
+                grid.push(row);
+                if (dayCounter > daysInMonth) break;
+            }
+
+            const getClassColorStyle = (clsName) => {
+                const clsObj = classList.find(c => c.name === clsName);
+                const theme = COLOR_PALETTE[clsObj ? clsObj.color : (guessColor(clsName) || 'gray')];
+                return `${theme.bgLight} ${theme.text}`;
+            };
+
+            const periodMap = {
+                '1': '①', '2': '②', '3': '③', '4': '④', '5': '⑤', '6': '⑥', '7': '⑦'
+            };
+
+            return (
+                <div className="h-full flex flex-col p-4 overflow-hidden">
+                    <div className="bg-white rounded-lg shadow border flex-1 flex flex-col">
+                        <div className="grid grid-cols-7 border-b bg-gray-50">
+                            {WEEK_DAYS.concat(['日']).map((d, i) => (
+                                <div key={i} className={`p-2 text-center text-sm font-bold ${i === 6 ? 'text-red-500' : 'text-gray-600'}`}>
+                                    {d}
+                                </div>
+                            ))}
+                        </div>
+                        <div className="flex-1 grid grid-rows-5 sm:grid-rows-6">
+                            {grid.map((row, rIdx) => (
+                                <div key={rIdx} className="grid grid-cols-7 h-full">
+                                    {row.map((date, cIdx) => {
+                                        if (!date) return <div key={cIdx} className="bg-gray-50/50 border-r border-b"></div>;
+                                        
+                                        const dateKey = formatDateKey(date);
+                                        const dayData = data[dateKey] || {};
+                                        const isToday = formatDateKey(new Date()) === dateKey;
+
+                                        const dayClasses = [];
+                                        ['1','2','3','4','5','6','7'].forEach(pid => {
+                                            const slot = dayData[pid];
+                                            if (slot && slot.classId) {
+                                                dayClasses.push({ pid, classId: slot.classId });
+                                            }
+                                        });
+
+                                        return (
+                                            <div 
+                                                key={cIdx} 
+                                                onClick={() => onNavigateToWeek(date)}
+                                                className={`
+                                                    border-r border-b p-1 relative hover:bg-blue-50 cursor-pointer transition flex flex-col
+                                                    ${isToday ? 'bg-blue-50' : ''}
+                                                `}
+                                            >
+                                                <div className="flex justify-between items-start mb-1">
+                                                    <span className={`text-sm font-bold w-6 h-6 flex items-center justify-center rounded-full ${isToday ? 'bg-blue-600 text-white' : ''}`}>
+                                                        {date.getDate()}
+                                                    </span>
+                                                </div>
+                                                <div className="flex-1 overflow-hidden flex flex-wrap content-start gap-1">
+                                                    {dayClasses.map((item, idx) => (
+                                                        <span key={idx} className={`text-[10px] font-bold px-1 rounded flex items-center ${getClassColorStyle(item.classId)}`}>
+                                                            <span className="mr-0.5 opacity-70">{periodMap[item.pid]}</span>
+                                                            {item.classId}
+                                                        </span>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
         const App = () => {
             const [currentDate, setCurrentDate] = useState(new Date()); 
             const [viewMode, setViewMode] = useState('week'); 
@@ -805,7 +905,7 @@
                 if (savedTitle) setTeacherTitle(savedTitle);
             }, []);
 
-            // Real-time Sync Logic (Replaces manual fetch)
+            // Real-time Sync Logic
             useEffect(() => {
                 if (!useCloud || !auth || !db) return;
 
@@ -824,14 +924,10 @@
                     const docRef = db.collection('artifacts').doc(appId).collection('public').doc('data').collection('weekly_plans').doc(syncId);
                     
                     unsubscribe = docRef.onSnapshot((doc) => {
-                        // ignore local writes to prevent loops/jitters
                         if (doc.metadata.hasPendingWrites) return; 
 
                         if (doc.exists) {
                             const remoteData = doc.data();
-                            // console.log("Realtime update received"); // debug
-                            
-                            // Merge logic: Update state from remote
                             if (remoteData.schedule) setScheduleData(remoteData.schedule);
                             if (remoteData.classes) {
                                 const rClasses = remoteData.classes;
@@ -843,10 +939,8 @@
                             }
                             if (remoteData.title) setTeacherTitle(remoteData.title);
                             
-                            setIsCloudLoaded(true); // Mark as safe to write
+                            setIsCloudLoaded(true); 
                         } else {
-                            // Doc doesn't exist yet on cloud.
-                            // Only mark loaded if we are sure we connected.
                             setIsCloudLoaded(true); 
                         }
                     }, (error) => {
@@ -1072,18 +1166,9 @@
                         }
                         if(parsed.title) setTeacherTitle(parsed.title);
                         
-                        setIsCloudLoaded(true); // ローカル復元完了とみなす
-                        
-                        // ここでまず成功メッセージ
-                        alert("バックアップファイルからデータを復元しました。\n続けてクラウドへの同期を試みます。");
-
-                        // クラウド同期
-                        const success = await saveToCloud(parsed.schedule, parsed.classes, parsed.title || teacherTitle);
-                        if (success) {
-                            console.log("Cloud sync successful after import");
-                        } else {
-                            // saveToCloud内でアラートが出るのでここでは出さないか、補足する
-                        }
+                        setIsCloudLoaded(true);
+                        saveToCloud(parsed.schedule, parsed.classes, parsed.title || teacherTitle);
+                        alert("データを復元しました。");
                     } catch (error) {
                         console.error(error);
                         alert(`ファイルの読み込みに失敗しました。\nエラー: ${error.message}`);
