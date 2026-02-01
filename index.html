@@ -6,12 +6,13 @@
     <title>Teacher's Log Pro</title>
     
     <!-- 
-      【Teacher's Log Pro v4.0 (Easy Config)】
+      【Teacher's Log Pro v4.2 (Robust Import)】
       
       [修正内容]
-      - 設定画面からFirebaseの設定情報（Config）を直接貼り付けて更新できる機能を追加。
-      - HTMLファイルを直接編集しなくても、プロジェクトの変更に対応可能にしました。
-      - エラーハンドリングを強化し、詳細なエラーコードを表示。
+      - JSONインポート処理の堅牢化。
+      - ファイル読み込み成功（ローカル復元）と、その後のクラウド同期処理を分離。
+      - クラウドエラーが発生しても、ローカルへの復元は完了するように変更。
+      - ファイル入力のリセット処理を追加（連続で同じファイルを読み込めるように修正）。
     -->
 
     <!-- React & ReactDOM -->
@@ -83,12 +84,9 @@
         // ==========================================
         // ※ 設定画面から入力された値が優先されます
         const defaultFirebaseConfig = {
-            apiKey: "AIzaSyCPAOKwJZuCbR6WyC28itym-zCiuJsNBzY",
-            authDomain: "teachers-log-2.firebaseapp.com",
-            projectId: "teachers-log-2",
-            storageBucket: "teachers-log-2.firebasestorage.app",
-            messagingSenderId: "204327363691",
-            appId: "1:204327363691:web:a8ea8aaabcba1e7090fd2e"
+            apiKey: "", 
+            authDomain: "",
+            projectId: ""
         };
         // ==========================================
 
@@ -102,12 +100,10 @@
         if (savedConfigStr) {
             try {
                 activeConfig = JSON.parse(savedConfigStr);
-                console.log("Using custom Firebase config from localStorage");
             } catch (e) {
                 console.error("Failed to parse saved config", e);
             }
         } else if (typeof __firebase_config !== 'undefined' && __firebase_config) {
-            // Environment variable fallback
             activeConfig = JSON.parse(__firebase_config);
         }
 
@@ -123,13 +119,12 @@
                 auth = firebase.auth();
             } catch (e) {
                 console.error("Firebase init error:", e);
-                // 初期化エラーは画面ロード後にアラート等で出すのが親切だが、ここではログのみ
             }
         }
 
         const { useState, useEffect, useMemo, useCallback, useRef } = React;
 
-        const APP_VERSION = "v4.0";
+        const APP_VERSION = "v4.2";
         const WEEK_DAYS = ['月', '火', '水', '木', '金', '土'];
         
         const COLOR_PALETTE = {
@@ -405,41 +400,31 @@
                 if (!configInput.trim()) return;
                 
                 try {
-                    // Try to parse input. Allow both raw JSON and "const firebaseConfig = {...}" format
-                    let jsonStr = configInput;
-                    const match = configInput.match(/{[\s\S]*}/);
-                    if (match) {
-                        jsonStr = match[0];
-                    }
-                    
-                    // Simple cleaning for relaxed JSON (keys without quotes) if needed, 
-                    // but standard Firebase console output is JS object literal, not strict JSON.
-                    // We'll try to eval it safely or ask user to provide strict JSON. 
-                    // Ideally, user copies the object literal. 
-                    // Since eval is dangerous, let's try a regex-based approach to quote keys or assume valid JSON.
-                    // For now, let's assume the user copies the {...} part and it might need formatting.
-                    // Actually, easiest is to tell user to format as JSON or use a simple Function constructor 
-                    // (sandboxed if possible, but here client side only).
-                    
-                    // Let's use a safer approach: warn if it fails JSON.parse, 
-                    // but also try to allow JS object literal by wrapping in parens and eval-ing (risk accepted as it's local tool)
-                    let configObj;
-                    try {
-                        configObj = JSON.parse(jsonStr);
-                    } catch {
-                        // Fallback: try evaluating as JS object
-                        // Note: Function(...) is safer than eval() but still powerful. 
-                        // Since this is a tool for self-use, it's acceptable.
-                        configObj = new Function("return " + jsonStr)();
-                    }
+                    // Extract key-value pairs using regex to avoid eval() and strict JSON requirements
+                    const extract = (key, text) => {
+                        // Look for key: "value" or key: 'value' (handling whitespace)
+                        const regex = new RegExp(`${key}\\s*:\\s*["']([^"']+)["']`);
+                        const match = text.match(regex);
+                        return match ? match[1] : null;
+                    };
 
-                    if (configObj && configObj.apiKey) {
+                    const apiKey = extract('apiKey', configInput);
+                    const authDomain = extract('authDomain', configInput);
+                    const projectId = extract('projectId', configInput);
+                    const storageBucket = extract('storageBucket', configInput);
+                    const messagingSenderId = extract('messagingSenderId', configInput);
+                    const appId = extract('appId', configInput);
+
+                    if (apiKey && projectId) {
+                        const configObj = {
+                            apiKey, authDomain, projectId, storageBucket, messagingSenderId, appId
+                        };
                         localStorage.setItem('teacherLogFirebaseConfig', JSON.stringify(configObj));
                         if(confirm("Firebase設定を保存しました。反映するためにページを再読み込みしますか？")) {
                             window.location.reload();
                         }
                     } else {
-                        alert("有効なFirebase設定が見つかりませんでした。\n{ apiKey: ... } の形式が含まれているか確認してください。");
+                        alert("有効なFirebase設定が見つかりませんでした。\n「apiKey」や「projectId」が含まれているか確認してください。");
                     }
                 } catch (e) {
                     console.error(e);
@@ -501,7 +486,7 @@
                             <div className="bg-gray-100 p-4 rounded-lg border border-gray-200">
                                 <h3 className="font-bold text-gray-700 text-sm mb-2 flex items-center gap-1"><Icons.ClipboardCheck size={16}/> Firebase設定の上書き (上級者向け)</h3>
                                 <p className="text-xs text-gray-600 mb-2">
-                                    プロジェクトを作り直した場合など、新しい <code>const firebaseConfig = &#123;...&#125;</code> をここに貼り付けて更新できます。
+                                    Firebaseコンソールからコピーしたコード（<code>const firebaseConfig = ...</code>）をそのまま貼り付けて更新できます。
                                 </p>
                                 <textarea 
                                     className="w-full border rounded p-2 text-xs font-mono h-20 mb-2"
@@ -849,7 +834,7 @@
                 if (savedTitle) setTeacherTitle(savedTitle);
             }, []);
 
-            // Real-time Sync Logic (Replaces manual fetch)
+            // Real-time Sync Logic
             useEffect(() => {
                 if (!useCloud || !auth || !db) return;
 
@@ -868,14 +853,10 @@
                     const docRef = db.collection('artifacts').doc(appId).collection('public').doc('data').collection('weekly_plans').doc(syncId);
                     
                     unsubscribe = docRef.onSnapshot((doc) => {
-                        // ignore local writes to prevent loops/jitters
                         if (doc.metadata.hasPendingWrites) return; 
 
                         if (doc.exists) {
                             const remoteData = doc.data();
-                            // console.log("Realtime update received"); // debug
-                            
-                            // Merge logic: Update state from remote
                             if (remoteData.schedule) setScheduleData(remoteData.schedule);
                             if (remoteData.classes) {
                                 const rClasses = remoteData.classes;
@@ -887,10 +868,8 @@
                             }
                             if (remoteData.title) setTeacherTitle(remoteData.title);
                             
-                            setIsCloudLoaded(true); // Mark as safe to write
+                            setIsCloudLoaded(true); 
                         } else {
-                            // Doc doesn't exist yet on cloud.
-                            // Only mark loaded if we are sure we connected.
                             setIsCloudLoaded(true); 
                         }
                     }, (error) => {
@@ -904,14 +883,12 @@
             }, [syncId, useCloud]); 
 
             // Save to Firestore on Change
-            // ★ UPDATED: Now returns a boolean promise indicating success
             const saveToCloud = useCallback(async (newSchedule, newClasses, newTitle) => {
                 if (!useCloud || !auth) {
                     alert("クラウド機能が無効です。Firebase設定を確認してください。");
                     return false;
                 }
                 
-                // Ensure auth
                 if (!auth.currentUser) {
                     try {
                         await auth.signInAnonymously();
@@ -934,12 +911,12 @@
                     return true;
                 } catch (e) {
                     console.error("Cloud save failed:", e);
-                    alert(`クラウド保存に失敗しました。\nエラー詳細: ${e.message}\n\nFirestoreの「ルール」タブで、書き込みが許可(allow write: if true)されているか確認してください。`);
+                    // Detailed error message
+                    alert(`クラウド保存に失敗しました。\nエラーコード: ${e.code}\nエラー詳細: ${e.message}\n\n※「permission-denied」の場合、Firestoreのルール設定が原因です。`);
                     return false;
                 }
-            }, [syncId, useCloud]); // Removed isCloudLoaded guard for manual saves
+            }, [syncId, useCloud]);
 
-            // Manual Fetch / Connect (Smart Logic)
             const fetchFromCloud = useCallback(async (targetId = syncId) => {
                 if (!useCloud || !auth || !db) return;
                 setIsSyncing(true);
@@ -948,9 +925,8 @@
                      const doc = await docRef.get();
                      
                      if (doc.exists) {
-                         // Data found on cloud
                          const remoteData = doc.data();
-                         if (window.confirm("【データ受信】\nクラウドに保存されたデータが見つかりました。\n\nクラウドのデータをダウンロードして、表示を上書きしますか？\n（※iPadなど2台目以降の場合は「OK」を押してください）")) {
+                         if (window.confirm("【データ受信】\nクラウドに保存されたデータが見つかりました。\n\nクラウドのデータをダウンロードして、表示を上書きしますか？")) {
                              if (remoteData.schedule) setScheduleData(remoteData.schedule);
                              if (remoteData.classes) setClassList(remoteData.classes);
                              if (remoteData.title) setTeacherTitle(remoteData.title);
@@ -958,7 +934,6 @@
                          }
                          setIsCloudLoaded(true);
                      } else {
-                         // Data NOT found on cloud
                          if (window.confirm("【新規作成】\nクラウドにデータがありませんでした。\n\n現在表示されているデータをクラウドに登録して、この端末を「親」として同期を開始しますか？")) {
                              await saveToCloud(scheduleData, classList, teacherTitle);
                              alert("アップロードしました。\nこれで他の端末からも同じIDでアクセスできます。");
@@ -1039,7 +1014,6 @@
                     }
                 };
                 setScheduleData(updatedSchedule);
-                // Auto-save logic: try to save, but don't alert on failure to avoid annoyance during quick edits
                 if (isCloudLoaded) {
                     saveToCloud(updatedSchedule, classList, teacherTitle);
                 }
@@ -1081,7 +1055,6 @@
             };
 
             const handleManualLoad = async () => {
-                // Manual load uses the same logic as fetchFromCloud
                 await fetchFromCloud();
             };
 
@@ -1102,23 +1075,44 @@
             const importData = (event) => {
                 const fileReader = new FileReader();
                 fileReader.readAsText(event.target.files[0], "UTF-8");
-                fileReader.onload = e => {
-                    const parsed = JSON.parse(e.target.result);
-                    if(parsed.schedule) setScheduleData(parsed.schedule);
-                    if(parsed.classes) {
-                         const rClasses = parsed.classes;
-                         if (rClasses.length > 0 && typeof rClasses[0] === 'string') {
-                             setClassList(rClasses.map(c => ({ name: c, color: guessColor(c) })));
-                         } else {
-                             setClassList(rClasses);
-                         }
+                fileReader.onload = async e => {
+                    try {
+                        const parsed = JSON.parse(e.target.result);
+                        
+                        // バリデーション（簡易）
+                        if (!parsed.schedule && !parsed.classes) {
+                            throw new Error("無効なファイル形式です。");
+                        }
+
+                        if(parsed.schedule) setScheduleData(parsed.schedule);
+                        if(parsed.classes) {
+                             const rClasses = parsed.classes;
+                             if (rClasses.length > 0 && typeof rClasses[0] === 'string') {
+                                 setClassList(rClasses.map(c => ({ name: c, color: guessColor(c) })));
+                             } else {
+                                 setClassList(rClasses);
+                             }
+                        }
+                        if(parsed.title) setTeacherTitle(parsed.title);
+                        
+                        setIsCloudLoaded(true); // ローカル復元完了とみなす
+                        
+                        // ここでまず成功メッセージ
+                        alert("バックアップファイルからデータを復元しました。\n続けてクラウドへの同期を試みます。");
+
+                        // クラウド同期
+                        const success = await saveToCloud(parsed.schedule, parsed.classes, parsed.title || teacherTitle);
+                        if (success) {
+                            console.log("Cloud sync successful after import");
+                        } else {
+                            // saveToCloud内でアラートが出るのでここでは出さないか、補足する
+                        }
+                    } catch (error) {
+                        console.error(error);
+                        alert(`ファイルの読み込みに失敗しました。\nエラー: ${error.message}`);
                     }
-                    if(parsed.title) setTeacherTitle(parsed.title);
-                    
-                    setIsCloudLoaded(true);
-                    // Try auto save after import
-                    saveToCloud(parsed.schedule, parsed.classes, parsed.title || teacherTitle);
-                    alert("データを復元しました。");
+                    // Inputをリセットして同じファイルを再度選べるようにする
+                    event.target.value = '';
                 };
             };
 
