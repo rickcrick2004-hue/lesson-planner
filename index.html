@@ -6,11 +6,11 @@
     <title>Teacher's Log Pro</title>
     
     <!-- 
-      【Teacher's Log Pro v3.8 (Message Improved)】
+      【Teacher's Log Pro v3.9 (Error Diagnostics)】
       
       [修正内容]
-      - クラウド接続時の確認メッセージを、状況（新規/受信）に応じてより分かりやすく変更。
-      - エラー時の案内文を強化。
+      - エラー発生時に、詳細なエラーコード（e.message）をアラート表示するように改良。
+      - これにより「認証エラー」か「データベース権限エラー」かを特定しやすくしました。
     -->
 
     <!-- React & ReactDOM -->
@@ -109,13 +109,13 @@
                 auth = firebase.auth();
             } catch (e) {
                 console.error("Firebase init error:", e);
-                alert("Firebaseの初期化に失敗しました。設定を確認してください。");
+                alert("Firebaseの初期化に失敗しました。\nAPIキーの設定を確認してください。");
             }
         }
 
         const { useState, useEffect, useMemo, useCallback, useRef } = React;
 
-        const APP_VERSION = "v3.8";
+        const APP_VERSION = "v3.9";
         const WEEK_DAYS = ['月', '火', '水', '木', '金', '土'];
         
         const COLOR_PALETTE = {
@@ -839,7 +839,7 @@
                         await auth.signInAnonymously();
                     } catch (e) {
                         console.error("Auth failed:", e);
-                        alert("クラウド認証に失敗しました。FirebaseコンソールのAuthentication設定で「匿名(Anonymous)」が有効になっているか確認してください。");
+                        alert(`クラウド認証に失敗しました。\nエラー詳細: ${e.message}\n\nFirebaseコンソールのAuthenticationで「匿名」が有効か、APIキーが正しいか確認してください。`);
                         return false;
                     }
                 }
@@ -856,7 +856,7 @@
                     return true;
                 } catch (e) {
                     console.error("Cloud save failed:", e);
-                    alert("クラウド保存に失敗しました。権限や通信状態を確認してください。\n(Firestoreのルール設定は完了していますか？)");
+                    alert(`クラウド保存に失敗しました。\nエラー詳細: ${e.message}\n\nFirestoreの「ルール」タブで、書き込みが許可(allow write: if true)されているか確認してください。`);
                     return false;
                 }
             }, [syncId, useCloud]); // Removed isCloudLoaded guard for manual saves
@@ -889,7 +889,7 @@
                      }
                 } catch(e) { 
                     console.error(e);
-                    alert("接続エラーが発生しました。FirebaseのAuthentication設定などを確認してください。");
+                    alert(`接続エラーが発生しました。\nエラー詳細: ${e.message}`);
                 }
                 finally { setIsSyncing(false); }
             }, [syncId, useCloud, scheduleData, classList, teacherTitle, saveToCloud]); 
