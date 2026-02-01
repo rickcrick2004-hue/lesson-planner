@@ -6,12 +6,11 @@
     <title>Teacher's Log Pro</title>
     
     <!-- 
-      【Teacher's Log Pro v3.6 (Debugged)】
+      【Teacher's Log Pro v3.8 (Message Improved)】
       
       [修正内容]
-      - 初回接続時にデータをアップロードするフローを強化
-      - 通信エラー時のアラート表示を追加
-      - ヘッダーボタンのレイアウト調整
+      - クラウド接続時の確認メッセージを、状況（新規/受信）に応じてより分かりやすく変更。
+      - エラー時の案内文を強化。
     -->
 
     <!-- React & ReactDOM -->
@@ -116,7 +115,7 @@
 
         const { useState, useEffect, useMemo, useCallback, useRef } = React;
 
-        const APP_VERSION = "v3.6";
+        const APP_VERSION = "v3.8";
         const WEEK_DAYS = ['月', '火', '水', '木', '金', '土'];
         
         const COLOR_PALETTE = {
@@ -827,12 +826,23 @@
             }, [syncId, useCloud]); 
 
             // Save to Firestore on Change
+            // ★ UPDATED: Now returns a boolean promise indicating success
             const saveToCloud = useCallback(async (newSchedule, newClasses, newTitle) => {
-                if (!useCloud || !auth || !auth.currentUser) return;
-                // Guard clause
-                // if (!isCloudLoaded && Object.keys(newSchedule).length === 0) {
-                //      return;
-                // }
+                if (!useCloud || !auth) {
+                    alert("クラウド機能が無効です。Firebase設定を確認してください。");
+                    return false;
+                }
+                
+                // Ensure auth
+                if (!auth.currentUser) {
+                    try {
+                        await auth.signInAnonymously();
+                    } catch (e) {
+                        console.error("Auth failed:", e);
+                        alert("クラウド認証に失敗しました。FirebaseコンソールのAuthentication設定で「匿名(Anonymous)」が有効になっているか確認してください。");
+                        return false;
+                    }
+                }
                 
                 try {
                     const docRef = db.collection('artifacts').doc(appId).collection('public').doc('data').collection('weekly_plans').doc(syncId);
@@ -843,11 +853,13 @@
                         title: newTitle,
                         lastUpdated: new Date().toISOString()
                     }, { merge: true });
+                    return true;
                 } catch (e) {
                     console.error("Cloud save failed:", e);
-                    alert("クラウド保存に失敗しました。権限や通信状態を確認してください。");
+                    alert("クラウド保存に失敗しました。権限や通信状態を確認してください。\n(Firestoreのルール設定は完了していますか？)");
+                    return false;
                 }
-            }, [syncId, useCloud, isCloudLoaded]);
+            }, [syncId, useCloud]); // Removed isCloudLoaded guard for manual saves
 
             // Manual Fetch / Connect (Smart Logic)
             const fetchFromCloud = useCallback(async (targetId = syncId) => {
@@ -860,7 +872,7 @@
                      if (doc.exists) {
                          // Data found on cloud
                          const remoteData = doc.data();
-                         if (window.confirm("クラウドにデータが見つかりました。\n取り込みますか？（現在の手元のデータは上書きされます）")) {
+                         if (window.confirm("【データ受信】\nクラウドに保存されたデータが見つかりました。\n\nクラウドのデータをダウンロードして、表示を上書きしますか？\n（※iPadなど2台目以降の場合は「OK」を押してください）")) {
                              if (remoteData.schedule) setScheduleData(remoteData.schedule);
                              if (remoteData.classes) setClassList(remoteData.classes);
                              if (remoteData.title) setTeacherTitle(remoteData.title);
@@ -869,7 +881,7 @@
                          setIsCloudLoaded(true);
                      } else {
                          // Data NOT found on cloud
-                         if (window.confirm("クラウドにデータがありません（新規ID）。\n現在のデータをクラウドにアップロードして開始しますか？")) {
+                         if (window.confirm("【新規作成】\nクラウドにデータがありませんでした。\n\n現在表示されているデータをクラウドに登録して、この端末を「親」として同期を開始しますか？")) {
                              await saveToCloud(scheduleData, classList, teacherTitle);
                              alert("アップロードしました。\nこれで他の端末からも同じIDでアクセスできます。");
                          }
@@ -877,10 +889,10 @@
                      }
                 } catch(e) { 
                     console.error(e);
-                    alert("接続エラーが発生しました。");
+                    alert("接続エラーが発生しました。FirebaseのAuthentication設定などを確認してください。");
                 }
                 finally { setIsSyncing(false); }
-            }, [syncId, useCloud, scheduleData, classList, teacherTitle, saveToCloud]); // dependencies updated
+            }, [syncId, useCloud, scheduleData, classList, teacherTitle, saveToCloud]); 
 
             useEffect(() => {
                 localStorage.setItem('teachersLogData', JSON.stringify(scheduleData));
@@ -949,19 +961,26 @@
                     }
                 };
                 setScheduleData(updatedSchedule);
-                saveToCloud(updatedSchedule, classList, teacherTitle);
+                // Auto-save logic: try to save, but don't alert on failure to avoid annoyance during quick edits
+                if (isCloudLoaded) {
+                    saveToCloud(updatedSchedule, classList, teacherTitle);
+                }
             };
 
             const handleUpdateClasses = (newClasses) => {
                 setIsCloudLoaded(true);
                 setClassList(newClasses);
-                saveToCloud(scheduleData, newClasses, teacherTitle);
+                if (isCloudLoaded) {
+                    saveToCloud(scheduleData, newClasses, teacherTitle);
+                }
             };
             
             const handleUpdateTeacherTitle = (newTitle) => {
                 setIsCloudLoaded(true);
                 setTeacherTitle(newTitle);
-                saveToCloud(scheduleData, classList, newTitle);
+                if (isCloudLoaded) {
+                    saveToCloud(scheduleData, classList, newTitle);
+                }
             };
 
             const handleNavigateFromMonth = (date) => {
@@ -976,14 +995,15 @@
             const handleManualSave = async () => {
                 if (!window.confirm("現在のデータをクラウドに上書き保存しますか？")) return;
                 setIsSyncing(true);
-                await saveToCloud(scheduleData, classList, teacherTitle);
+                const success = await saveToCloud(scheduleData, classList, teacherTitle);
                 setIsSyncing(false);
-                alert("クラウドに保存しました。");
+                if (success) {
+                    alert("クラウドに保存しました。");
+                }
             };
 
             const handleManualLoad = async () => {
-                // Manual load is essentially the same as "fetch from cloud" logic but user initiated
-                // Reuse fetchFromCloud but force confirm inside it
+                // Manual load uses the same logic as fetchFromCloud
                 await fetchFromCloud();
             };
 
@@ -1018,6 +1038,7 @@
                     if(parsed.title) setTeacherTitle(parsed.title);
                     
                     setIsCloudLoaded(true);
+                    // Try auto save after import
                     saveToCloud(parsed.schedule, parsed.classes, parsed.title || teacherTitle);
                     alert("データを復元しました。");
                 };
