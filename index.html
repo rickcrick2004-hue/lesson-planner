@@ -1,843 +1,1209 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>週案マネージャー</title>
-  <!-- Tailwind CSS -->
-  <script src="https://cdn.tailwindcss.com"></script>
-  <!-- React & Babel (安定版) -->
-  <script src="https://unpkg.com/@babel/standalone@7.24.7/babel.min.js"></script>
-  
-  <!-- Import Maps -->
-  <script type="importmap">
-    {
-      "imports": {
-        "react": "https://esm.sh/react@18.2.0",
-        "react-dom/client": "https://esm.sh/react-dom@18.2.0/client",
-        "lucide-react": "https://esm.sh/lucide-react@0.263.1",
-        "firebase/app": "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js",
-        "firebase/auth": "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js",
-        "firebase/firestore": "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js"
-      }
-    }
-  </script>
-
-  <style>
-    body { -webkit-tap-highlight-color: transparent; }
-    textarea { font-size: 16px; }
-  </style>
-</head>
-<body class="bg-slate-50 text-slate-800">
-  <div id="root"></div>
-
-  <!-- Main Application Script -->
-  <script type="text/babel" data-type="module" data-presets="react">
-    import React, { useState, useEffect, useRef } from 'react';
-    import { createRoot } from 'react-dom/client';
-    import { 
-      Calendar, ChevronLeft, ChevronRight, Home, List, CheckCircle2, BookOpen, 
-      ClipboardList, ArrowLeft, Calculator, X, Coffee, Sun, Sunset, FileText, 
-      Cloud, CloudOff, RefreshCw, Save, AlertTriangle, Settings, Plus, Trash2,
-      Download, Upload
-    } from 'lucide-react';
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teacher's Log Pro</title>
     
-    import { initializeApp } from 'firebase/app';
-    import { getAuth, signInAnonymously, onAuthStateChanged } from 'firebase/auth';
-    import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'firebase/firestore';
-
-    // ----------------------------------------------------
-    // Firebase設定 (ここをご自身のAPIキーに書き換えてください)
-    // ----------------------------------------------------
-    const firebaseConfig = {
-      apiKey: "API_KEY_HERE",
-      authDomain: "PROJECT_ID.firebaseapp.com",
-      projectId: "PROJECT_ID",
-      storageBucket: "PROJECT_ID.appspot.com",
-      messagingSenderId: "SENDER_ID",
-      appId: "APP_ID"
-    };
-    
-    let app, auth, db;
-    const appId = "weekly-lesson-plan";
-    let isFirebaseReady = false;
-
-    // 設定が書き換えられているかチェック
-    if (firebaseConfig.apiKey !== "API_KEY_HERE") {
-      try {
-        app = initializeApp(firebaseConfig);
-        auth = getAuth(app);
-        db = getFirestore(app);
-        isFirebaseReady = true;
-      } catch (e) {
-        console.error("Firebase init error:", e);
-      }
-    }
-
-    // --- Constants ---
-    const DEFAULT_SUBJECTS = [
-      { id: '1A_sci', name: '1A 理科', color: 'bg-blue-100 text-blue-800 border-blue-200' },
-      { id: '1B_sci', name: '1B 理科', color: 'bg-cyan-100 text-cyan-800 border-cyan-200' },
-      { id: '2A_sci', name: '2A 理科', color: 'bg-green-100 text-green-800 border-green-200' },
-      { id: '2B_sci', name: '2B 理科', color: 'bg-emerald-100 text-emerald-800 border-emerald-200' },
-      { id: '3A_sci', name: '3A 理科', color: 'bg-indigo-100 text-indigo-800 border-indigo-200' },
-      { id: '3B_sci', name: '3B 理科', color: 'bg-violet-100 text-violet-800 border-violet-200' },
-      { id: '1A_moral', name: '1A 道徳', color: 'bg-yellow-100 text-yellow-800 border-yellow-200' },
-      { id: '1A_hr', name: '1A HR', color: 'bg-pink-100 text-pink-800 border-pink-200' },
-      { id: '1A_sougou', name: '1A 総学', color: 'bg-orange-100 text-orange-800 border-orange-200' },
-      { id: 'other', name: 'その他', color: 'bg-gray-100 text-gray-800 border-gray-200' },
-    ];
-
-    const COLOR_PALETTES = [
-      { label: '青', value: 'bg-blue-100 text-blue-800 border-blue-200' },
-      { label: '水色', value: 'bg-cyan-100 text-cyan-800 border-cyan-200' },
-      { label: '緑', value: 'bg-green-100 text-green-800 border-green-200' },
-      { label: '深緑', value: 'bg-emerald-100 text-emerald-800 border-emerald-200' },
-      { label: '藍', value: 'bg-indigo-100 text-indigo-800 border-indigo-200' },
-      { label: '紫', value: 'bg-violet-100 text-violet-800 border-violet-200' },
-      { label: '黄', value: 'bg-yellow-100 text-yellow-800 border-yellow-200' },
-      { label: '桃', value: 'bg-pink-100 text-pink-800 border-pink-200' },
-      { label: '橙', value: 'bg-orange-100 text-orange-800 border-orange-200' },
-      { label: '灰', value: 'bg-gray-100 text-gray-800 border-gray-200' },
-    ];
-
-    const PERIODS = [
-      { id: 'submission', label: '提出物', shortLabel: '提', type: 'submission', icon: <FileText size={14} /> },
-      { id: 'morning_hr', label: '朝HR', shortLabel: '朝', type: 'hr', icon: <Sun size={14} /> },
-      { id: 1, label: '1限', shortLabel: '1', type: 'class' },
-      { id: 2, label: '2限', shortLabel: '2', type: 'class' },
-      { id: 3, label: '3限', shortLabel: '3', type: 'class' },
-      { id: 4, label: '4限', shortLabel: '4', type: 'class' },
-      { id: 'lunch', label: '昼休み', shortLabel: '昼', type: 'break', icon: <Coffee size={14} /> },
-      { id: 5, label: '5限', shortLabel: '5', type: 'class' },
-      { id: 6, label: '6限', shortLabel: '6', type: 'class' },
-      { id: 7, label: '7限', shortLabel: '7', type: 'class' },
-      { id: 'closing_hr', label: '帰HR', shortLabel: '帰', type: 'hr', icon: <Sunset size={14} /> },
-    ];
-
-    // --- Utilities ---
-    const formatDateKey = (date) => date.toISOString().split('T')[0];
-    
-    const getDaysInMonth = (year, month) => {
-      const date = new Date(year, month, 1);
-      const days = [];
-      while (date.getMonth() === month) {
-        days.push(new Date(date));
-        date.setDate(date.getDate() + 1);
-      }
-      return days;
-    };
-
-    const getDaysInWeek = (currentDate) => {
-      const tempDate = new Date(currentDate);
-      const day = tempDate.getDay(); 
-      const diffToMonday = day === 0 ? -6 : 1 - day;
-      const monday = new Date(tempDate);
-      monday.setDate(tempDate.getDate() + diffToMonday);
-      const days = [];
-      for (let i = 0; i < 6; i++) {
-        const nextDate = new Date(monday);
-        nextDate.setDate(monday.getDate() + i);
-        days.push(nextDate);
-      }
-      return days;
-    };
-
-    const getDayName = (date) => ['日', '月', '火', '水', '木', '金', '土'][date.getDay()];
-
-    // --- Error Boundary ---
-    class ErrorBoundary extends React.Component {
-      constructor(props) {
-        super(props);
-        this.state = { hasError: false, error: null };
-      }
-      static getDerivedStateFromError(error) { return { hasError: true, error }; }
-      componentDidCatch(error, errorInfo) { console.error("Uncaught error:", error, errorInfo); }
-      render() {
-        if (this.state.hasError) {
-          return (
-            <div className="min-h-screen flex items-center justify-center bg-red-50 p-6">
-              <div className="bg-white p-8 rounded-2xl shadow-xl max-w-lg w-full border border-red-100 text-center">
-                <div className="mx-auto w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mb-4">
-                    <AlertTriangle className="text-red-600" size={32} />
-                </div>
-                <h2 className="text-2xl font-bold text-slate-800 mb-2">問題が発生しました</h2>
-                <p className="text-slate-600 mb-6">再読み込みを行ってください。</p>
-                <button onClick={() => window.location.reload()} className="w-full bg-slate-800 text-white font-bold py-3 rounded-xl hover:bg-slate-700 transition">
-                  <RefreshCw size={18} className="inline mr-2" /> 再読み込み
-                </button>
-              </div>
-            </div>
-          );
-        }
-        return this.props.children;
-      }
-    }
-
-    // --- Main Component ---
-    function WeeklyLessonPlanner() {
-      // State
-      const [view, setView] = useState('week'); 
-      const [currentDate, setCurrentDate] = useState(new Date());
-      const [selectedDate, setSelectedDate] = useState(new Date());
-      const [scheduleData, setScheduleData] = useState({});
-      const [subjects, setSubjects] = useState(DEFAULT_SUBJECTS);
-      const [className, setClassName] = useState('1A');
+    <!-- 
+      【Teacher's Log Pro v3.0】
       
-      const [showSettingsModal, setShowSettingsModal] = useState(false);
-      const [selectedSubjectHistory, setSelectedSubjectHistory] = useState(null);
-      const [quickMenu, setQuickMenu] = useState(null);
-      const [showCloudModal, setShowCloudModal] = useState(false);
+      世界最高の教師のための、世界最高の週案アプリ。
+      
+      [機能]
+      - 週案の作成・編集
+      - 月間カレンダー表示
+      - クラスごとの実施時数集計
+      - 検索機能
+      - クラウド同期 (Google Firebase)
+      - 公文書用印刷モード
+      - レスポンシブ対応 (iPad/PC)
+    -->
 
-      // Cloud State
-      const [user, setUser] = useState(null);
-      const [syncId, setSyncId] = useState(''); 
-      const [isSyncing, setIsSyncing] = useState(false);
-      const [lastSynced, setLastSynced] = useState(null);
-      const [cloudError, setCloudError] = useState('');
-      const [localLastEditedAt, setLocalLastEditedAt] = useState(new Date(0)); 
-      const initialLoadDone = useRef(false);
+    <!-- React & ReactDOM -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    
+    <!-- Babel -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Firebase SDKs -->
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
 
-      // Initialize
-      useEffect(() => {
-        if (subjects.length > 0 && !selectedSubjectHistory) {
-          setSelectedSubjectHistory(subjects[0].id);
-        }
-        // Load Local Storage
-        try {
-            const savedData = localStorage.getItem('lessonPlanData');
-            if (savedData) setScheduleData(JSON.parse(savedData));
-            const savedSettings = localStorage.getItem('lessonPlanSettings');
-            if (savedSettings) {
-                const parsed = JSON.parse(savedSettings);
-                if (parsed.subjects) setSubjects(parsed.subjects);
-                if (parsed.className) setClassName(parsed.className);
-            }
-            setLocalLastEditedAt(new Date());
-            const savedSyncId = localStorage.getItem('lessonPlanSyncId');
-            if (savedSyncId) setSyncId(savedSyncId);
-        } catch (e) { console.error(e); }
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
 
-        // Firebase Auth
-        if (isFirebaseReady) {
-          signInAnonymously(auth).catch(e => console.error("Auth Error", e));
-          const unsubscribe = onAuthStateChanged(auth, setUser);
-          return () => unsubscribe();
-        }
-      }, []);
-
-      // Cloud Sync Listener
-      useEffect(() => {
-        if (!isFirebaseReady || !user || !syncId) return;
-        const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'shared_plans', syncId);
-        setIsSyncing(true);
-        const unsubscribe = onSnapshot(docRef, (docSnap) => {
-          if (docSnap.exists()) {
-            const remoteData = docSnap.data();
-            let remoteTime = new Date(0);
-            if (remoteData.updatedAt?.toDate) remoteTime = remoteData.updatedAt.toDate();
-            else if (remoteData.updatedAt) remoteTime = new Date(remoteData.updatedAt);
-
-            const isRemoteEmpty = !remoteData.scheduleData || Object.keys(remoteData.scheduleData).length === 0;
-            const isLocalNotEmpty = Object.keys(scheduleData).length > 0;
-            
-            if (isRemoteEmpty && isLocalNotEmpty) {
-                setIsSyncing(false); return; 
-            }
-
-            const isRemoteNewer = remoteTime.getTime() > localLastEditedAt.getTime();
-            const isFirstSync = !initialLoadDone.current;
-
-            if (isRemoteNewer || (isFirstSync && !isLocalNotEmpty)) {
-                if (remoteData.scheduleData) setScheduleData(remoteData.scheduleData);
-                if (remoteData.settings) {
-                    if (remoteData.settings.subjects) setSubjects(remoteData.settings.subjects);
-                    if (remoteData.settings.className) setClassName(remoteData.settings.className);
-                }
-                setLastSynced(remoteTime);
-                setLocalLastEditedAt(remoteTime);
-            }
-            initialLoadDone.current = true;
-          } else { initialLoadDone.current = true; }
-          setIsSyncing(false);
-        }, (error) => { setIsSyncing(false); setCloudError("同期エラー"); });
-        return () => unsubscribe();
-      }, [user, syncId]);
-
-      // Save Data
-      useEffect(() => {
-        localStorage.setItem('lessonPlanData', JSON.stringify(scheduleData));
-        localStorage.setItem('lessonPlanSettings', JSON.stringify({ subjects, className }));
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&display=swap');
         
-        if (!isFirebaseReady || (Object.keys(scheduleData).length === 0 && subjects.length === DEFAULT_SUBJECTS.length)) return;
+        body {
+            font-family: 'Noto Sans JP', sans-serif;
+            background-color: #f3f4f6;
+            overscroll-behavior-y: none; /* iPadでのプルリフレッシュ防止 */
+        }
 
-        const timeoutId = setTimeout(async () => {
-          if (user && syncId) {
-            setIsSyncing(true);
-            try {
-                const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'shared_plans', syncId);
-                const now = new Date();
-                await setDoc(docRef, {
-                    scheduleData, settings: { subjects, className }, updatedAt: now, updatedBy: user.uid
-                }, { merge: true });
-                setLastSynced(now);
-                setLocalLastEditedAt(now);
-            } catch (error) { console.error("Save failed", error); } 
-            finally { setIsSyncing(false); }
-          }
-        }, 1500);
-        return () => clearTimeout(timeoutId);
-      }, [scheduleData, subjects, className, user, syncId]);
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: #f1f1f1; 
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #c1c1c1; 
+            border-radius: 4px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+            background: #a8a8a8; 
+        }
 
-      // --- Helper Functions ---
-      const handleDataChange = () => setLocalLastEditedAt(new Date());
-      
-      const updatePeriodData = (dateKey, periodId, field, value) => {
-        setScheduleData(prev => {
-          const newData = { ...prev };
-          if (!newData[dateKey]) newData[dateKey] = { periods: {} };
-          if (!newData[dateKey].periods) newData[dateKey].periods = {};
-          if (!newData[dateKey].periods[periodId]) newData[dateKey].periods[periodId] = { subject: '', plan: '', result: '' };
-          newData[dateKey].periods[periodId][field] = value;
-          return newData;
-        });
-        handleDataChange();
-      };
-
-      const toggleSubject = (dateKey, periodId, subjectName) => {
-        const currentSubject = scheduleData[dateKey]?.periods?.[periodId]?.subject;
-        const newValue = currentSubject === subjectName ? '' : subjectName;
-        updatePeriodData(dateKey, periodId, 'subject', newValue);
-      };
-
-      const updateDayData = (dateKey, field, value) => {
-        setScheduleData(prev => {
-          const newData = { ...prev };
-          if (!newData[dateKey]) newData[dateKey] = { periods: {} };
-          newData[dateKey][field] = value;
-          return newData;
-        });
-        handleDataChange();
-      };
-
-      const getDayData = (date) => scheduleData[formatDateKey(date)] || { periods: {} };
-      
-      // *** ここで goToToday を定義 ***
-      const goToToday = () => { 
-        const t = new Date(); 
-        setCurrentDate(t); 
-        setSelectedDate(t); 
-      };
-      
-      const handlePrev = () => { 
-        const d = new Date(currentDate); 
-        view === 'month' ? d.setMonth(d.getMonth()-1) : d.setDate(d.getDate()-7); 
-        setCurrentDate(d); 
-      };
-      
-      const handleNext = () => { 
-        const d = new Date(currentDate); 
-        view === 'month' ? d.setMonth(d.getMonth()+1) : d.setDate(d.getDate()+7); 
-        setCurrentDate(d); 
-      };
-
-      // Settings Logic
-      const handleAddSubject = () => setSubjects([...subjects, { id: `custom_${Date.now()}`, name: '新規科目', color: COLOR_PALETTES[0].value }]);
-      const handleUpdateSubject = (id, field, value) => setSubjects(subjects.map(s => s.id === id ? { ...s, [field]: value } : s));
-      const handleDeleteSubject = (id) => { if(confirm('削除しますか？')) setSubjects(subjects.filter(s => s.id !== id)); };
-      
-      const handleExportData = () => {
-        const dataStr = JSON.stringify({ scheduleData, settings: { subjects, className } }, null, 2);
-        const blob = new Blob([dataStr], { type: "application/json" });
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = `週案バックアップ_${formatDateKey(new Date())}.json`;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-      };
-
-      const handleImportData = (e) => {
-        const file = e.target.files[0];
-        if (!file) return;
-        const reader = new FileReader();
-        reader.onload = (ev) => {
-          try {
-            const imported = JSON.parse(ev.target.result);
-            if (imported.scheduleData) setScheduleData(imported.scheduleData);
-            if (imported.settings) {
-                if (imported.settings.subjects) setSubjects(imported.settings.subjects);
-                if (imported.settings.className) setClassName(imported.settings.className);
+        /* --- Print Specific Styles --- */
+        @media print {
+            body { background-color: white; -webkit-print-color-adjust: exact; }
+            .no-print { display: none !important; }
+            .print-only { display: block !important; }
+            .print-container { 
+                width: 100%; 
+                border: 1px solid #000;
+                font-size: 10pt;
             }
-            setLocalLastEditedAt(new Date());
-            alert("データを復元しました");
-          } catch (err) { alert("ファイルエラー"); }
+            .print-row { page-break-inside: avoid; }
+            .print-border { border: 1px solid #000; }
+            
+            /* Reset specific tailwind constraints for print */
+            .h-screen { height: auto !important; }
+            .overflow-hidden { overflow: visible !important; }
+            .overflow-auto { overflow: visible !important; }
+        }
+        .print-only { display: none; }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        // ==========================================
+        //  FIREBASE CONFIGURATION
+        // ==========================================
+        // クラウド同期機能を使う場合は、Firebaseコンソールでプロジェクトを作成し、
+        // ウェブアプリの設定から取得した `firebaseConfig` オブジェクトを
+        // 以下の変数に貼り付けてください。
+        // ※ 設定がない場合は、ブラウザ内の保存のみ（ローカルモード）で動作します。
+        
+        const firebaseConfig = {
+            // apiKey: "AIzaSyD...",
+            // authDomain: "your-project.firebaseapp.com",
+            // projectId: "your-project",
+            // storageBucket: "your-project.appspot.com",
+            // messagingSenderId: "...",
+            // appId: "..."
         };
-        reader.readAsText(file);
-      };
 
-      const calculateSubjectCounts = () => {
-        const counts = {};
-        subjects.forEach(s => counts[s.name] = 0);
-        Object.values(scheduleData).forEach(day => {
-          if (day.periods) {
-            Object.values(day.periods).forEach(p => {
-              if (p.subject && counts[p.subject] !== undefined) counts[p.subject]++;
-            });
-          }
-        });
-        return counts;
-      };
+        // ==========================================
 
-      // --- Render Functions (Defined Inside Component) ---
-      
-      // 1. Quick Menu
-      const renderQuickMenu = () => {
-        if (!quickMenu) return null;
-        const { dateKey, periodId, label, type } = quickMenu;
-        const periodData = scheduleData[dateKey]?.periods?.[periodId] || { subject: '', plan: '', result: '' };
-        const currentSubject = periodData.subject;
-        const currentPlan = periodData.plan || '';
-        const currentResult = periodData.result || '';
-        let placeholder = "予定・内容を入力...";
-        if (type === 'submission') placeholder = "提出物の内容を入力 (例: 数学ワークP20)...";
-        else if (type === 'hr') placeholder = "連絡事項・配布物など...";
-        else if (type === 'break') placeholder = "給食指導・昼休みの対応など...";
+        let db = null;
+        let auth = null;
+        
+        // 環境変数経由（開発環境用）または直接設定（本番用）を使用
+        const activeConfig = (typeof __firebase_config !== 'undefined' && __firebase_config) 
+            ? JSON.parse(__firebase_config) 
+            : firebaseConfig;
 
-        return (
-          <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/20 backdrop-blur-sm" onClick={() => setQuickMenu(null)}>
-            <div className="bg-white rounded-2xl shadow-xl border border-slate-200 p-5 w-[90%] max-w-md flex flex-col max-h-[90vh]" onClick={(e) => e.stopPropagation()}>
-              <div className="flex justify-between items-center mb-4 border-b border-slate-100 pb-3">
-                <h3 className="font-bold text-lg text-slate-700 flex items-center gap-2">
-                  <span className={`min-w-8 h-8 px-2 rounded-lg flex items-center justify-center text-sm ${type === 'submission' ? 'bg-red-500 text-white' : 'bg-slate-800 text-white'}`}>{label}</span>
-                  <span>入力</span>
-                </h3>
-                <button onClick={() => setQuickMenu(null)} className="p-1 hover:bg-slate-100 rounded-full text-slate-400"><X size={20} /></button>
-              </div>
-              <div className="flex-1 overflow-y-auto">
-                {type === 'class' && (
-                  <div className="mb-4">
-                    <label className="block text-xs font-bold text-slate-400 mb-2">科目</label>
-                    <div className="grid grid-cols-2 gap-3">
-                      {subjects.map(s => (
-                        <button key={s.id} onClick={() => toggleSubject(dateKey, periodId, s.name)} className={`p-3 rounded-xl text-sm font-bold border-2 text-left flex items-center gap-2 ${currentSubject === s.name ? `${s.color.replace('border-', 'border-current ')} ring-2 ring-blue-200` : 'bg-white border-slate-100 text-slate-600'}`}>
-                          <span className={`w-3 h-3 rounded-full ${s.color.split(' ')[0]}`}></span>{s.name}{currentSubject === s.name && <CheckCircle2 className="ml-auto w-4 h-4" />}
-                        </button>
-                      ))}
-                    </div>
-                    <div className="mt-2 text-right"><button onClick={() => toggleSubject(dateKey, periodId, currentSubject)} className="text-xs text-slate-400 underline">解除</button></div>
-                  </div>
-                )}
-                <div className="mb-4">
-                  <label className="block text-xs font-bold text-slate-400 mb-2">{type === 'class' ? '予定' : '内容'}</label>
-                  <textarea value={currentPlan} onChange={(e) => updatePeriodData(dateKey, periodId, 'plan', e.target.value)} placeholder={placeholder} className="w-full h-32 p-3 text-sm bg-slate-50 border border-slate-200 rounded-lg outline-none" />
-                </div>
-                {type === 'class' && (
-                  <div className="mb-4">
-                    <label className="block text-xs font-bold text-green-600/70 mb-2">実績</label>
-                    <textarea value={currentResult} onChange={(e) => updatePeriodData(dateKey, periodId, 'result', e.target.value)} placeholder="実施内容..." className="w-full h-24 p-3 text-sm bg-slate-50 border border-slate-200 rounded-lg outline-none" />
-                  </div>
-                )}
-              </div>
-              <div className="mt-4 pt-3 border-t border-slate-100">
-                 <button onClick={() => setQuickMenu(null)} className="w-full bg-slate-800 text-white font-bold py-2.5 rounded-xl flex items-center justify-center gap-2"><CheckCircle2 size={18} />完了</button>
-              </div>
-            </div>
-          </div>
-        );
-      };
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'teachers-log-pro';
+        const useCloud = activeConfig.apiKey !== undefined;
 
-      // 2. Settings Modal
-      const renderSettingsModal = () => {
-        if (!showSettingsModal) return null;
-        return (
-          <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/40 backdrop-blur-sm" onClick={() => setShowSettingsModal(false)}>
-            <div className="bg-white rounded-2xl shadow-xl border border-slate-200 p-6 w-[95%] max-w-2xl max-h-[90vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
-              <div className="flex justify-between items-center mb-6 pb-4 border-b border-slate-100">
-                <h3 className="font-bold text-xl text-slate-800 flex items-center gap-2"><Settings className="text-slate-500" /> 設定</h3>
-                <button onClick={() => setShowSettingsModal(false)} className="p-1 hover:bg-slate-100 rounded-full text-slate-400"><X size={24} /></button>
-              </div>
-              <div className="flex-1 overflow-y-auto space-y-8 pr-2">
-                <section>
-                    <h4 className="font-bold text-slate-600 mb-3 text-sm">クラス名</h4>
-                    <div className="flex items-center gap-4">
-                        <div className="w-16 h-16 bg-slate-800 rounded-xl flex items-center justify-center text-white font-bold text-2xl shadow-lg">{className}</div>
-                        <input type="text" value={className} onChange={(e) => setClassName(e.target.value)} className="flex-1 p-3 bg-slate-50 border border-slate-200 rounded-lg font-bold" />
-                    </div>
-                </section>
-                <section>
-                    <div className="flex justify-between items-center mb-3">
-                        <h4 className="font-bold text-slate-600 text-sm">科目リスト</h4>
-                        <button onClick={handleAddSubject} className="flex items-center gap-1 text-xs bg-blue-50 text-blue-600 px-3 py-1.5 rounded-full font-bold"><Plus size={14} /> 追加</button>
-                    </div>
-                    <div className="space-y-3">
-                        {subjects.map((subject) => (
-                            <div key={subject.id} className="flex gap-2 items-center bg-white border border-slate-100 p-2 rounded-lg">
-                                <select value={subject.color} onChange={(e) => handleUpdateSubject(subject.id, 'color', e.target.value)} className={`h-10 w-24 rounded-md text-xs p-1 cursor-pointer ${subject.color}`}>
-                                    {COLOR_PALETTES.map(c => <option key={c.label} value={c.value} className="bg-white text-slate-800">{c.label}</option>)}
-                                </select>
-                                <input type="text" value={subject.name} onChange={(e) => handleUpdateSubject(subject.id, 'name', e.target.value)} className="flex-1 p-2 bg-slate-50 border border-slate-200 rounded text-sm font-bold" />
-                                <button onClick={() => handleDeleteSubject(subject.id)} className="p-2 text-slate-300 hover:text-red-500 rounded"><Trash2 size={16} /></button>
-                            </div>
-                        ))}
-                    </div>
-                </section>
-                <section className="pt-4 border-t border-slate-100">
-                    <h4 className="font-bold text-slate-600 mb-3 text-sm flex items-center gap-2"><Save size={16}/> バックアップ</h4>
-                    <div className="grid grid-cols-2 gap-4">
-                        <button onClick={handleExportData} className="flex items-center justify-center gap-2 p-3 bg-blue-50 text-blue-700 rounded-lg border border-blue-200"><Download size={18} /> 保存 (Export)</button>
-                        <label className="flex items-center justify-center gap-2 p-3 bg-slate-50 text-slate-700 rounded-lg border border-slate-200 cursor-pointer">
-                            <Upload size={18} /> 復元 (Import)
-                            <input type="file" accept=".json" onChange={handleImportData} className="hidden" />
-                        </label>
-                    </div>
-                </section>
-              </div>
-              <div className="mt-6 pt-4 border-t border-slate-100 text-right">
-                <button onClick={() => setShowSettingsModal(false)} className="bg-slate-800 text-white font-bold px-6 py-3 rounded-xl shadow-sm">保存して閉じる</button>
-              </div>
-            </div>
-          </div>
-        );
-      };
-
-      // 3. Cloud Modal
-      const renderCloudModal = () => {
-        if (!showCloudModal) return null;
-        return (
-          <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 backdrop-blur-sm" onClick={() => setShowCloudModal(false)}>
-            <div className="bg-white rounded-2xl shadow-xl border border-slate-200 p-6 w-[90%] max-w-md" onClick={(e) => e.stopPropagation()}>
-              <div className="flex justify-between items-center mb-4">
-                <h3 className="font-bold text-lg text-slate-800 flex items-center gap-2"><Cloud className="text-blue-500" /> 同期設定</h3>
-                <button onClick={() => setShowCloudModal(false)} className="p-1 hover:bg-slate-100 rounded-full text-slate-400"><X size={20} /></button>
-              </div>
-              <div className="bg-blue-50 border border-blue-100 p-3 rounded-lg text-xs text-blue-800 mb-4">
-                 <strong>アーカイブ機能:</strong> 合言葉を変えることで年度を切り替えられます。<br/>(例: <code>2025-classA</code> → <code>2026-classB</code>)
-              </div>
-              <div className="space-y-4">
-                <div>
-                    <label className="block text-sm font-bold text-slate-700 mb-1">合言葉 (Sync ID)</label>
-                    <input type="text" value={syncId} onChange={(e) => { setSyncId(e.target.value); localStorage.setItem('lessonPlanSyncId', e.target.value); }} placeholder="例: yamada-1a-2026" className="w-full p-3 bg-slate-50 border border-slate-200 rounded-lg font-mono text-lg" />
-                </div>
-                <div className="flex items-center gap-2 text-xs text-slate-500 bg-slate-50 p-3 rounded border border-slate-100">
-                    {isSyncing ? <RefreshCw className="animate-spin text-blue-500" size={14} /> : <CheckCircle2 className="text-green-500" size={14} />}
-                    {isSyncing ? "同期中..." : lastSynced ? `最終同期: ${lastSynced.toLocaleTimeString()}` : "接続待機中"}
-                </div>
-                {cloudError && <div className="text-xs text-red-500 bg-red-50 p-2 rounded">{cloudError}</div>}
-                <button onClick={() => setShowCloudModal(false)} className="w-full bg-blue-600 text-white font-bold py-2 rounded-lg">閉じる</button>
-              </div>
-            </div>
-          </div>
-        );
-      };
-
-      // 4. Week View
-      const renderWeekView = () => {
-        const days = getDaysInWeek(currentDate);
-        return (
-          <div className="h-full flex flex-col">
-            {/* 新規追加: 週表示用ヘッダー */}
-            <div className="flex items-center justify-between mb-2 px-1">
-              <h2 className="text-xl font-bold text-slate-700 flex items-center gap-2">
-                {currentDate.getFullYear()}年 {currentDate.getMonth() + 1}月
-                <span className="text-sm font-normal text-slate-500">第{Math.ceil(days[0].getDate() / 7)}週</span>
-              </h2>
-              <div className="flex gap-1">
-                 <button onClick={handlePrev} className="p-1.5 hover:bg-slate-100 rounded text-slate-500"><ChevronLeft /></button>
-                 <button onClick={goToToday} className="px-3 py-1.5 text-xs bg-slate-100 rounded hover:bg-slate-200 font-bold text-slate-600">今日</button>
-                 <button onClick={handleNext} className="p-1.5 hover:bg-slate-100 rounded text-slate-500"><ChevronRight /></button>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-6 gap-2 flex-1 overflow-hidden">
-              {days.map((day, i) => {
-                const dateKey = formatDateKey(day);
-                const data = scheduleData[dateKey];
-                const isToday = formatDateKey(new Date()) === dateKey;
-                const isSaturday = day.getDay() === 6;
-                return (
-                  <div key={dateKey} className={`flex flex-col bg-white rounded-xl shadow-sm border ${isToday ? 'border-blue-400 ring-2 ring-blue-100' : 'border-slate-200'} transition-all`}>
-                    <div onClick={() => { setSelectedDate(day); setView('day'); }} className={`p-3 text-center border-b border-slate-100 ${isToday ? 'bg-blue-50' : isSaturday ? 'bg-blue-50/30' : ''} rounded-t-xl cursor-pointer hover:bg-slate-100`}>
-                      <div className={`text-xs font-bold ${isSaturday ? 'text-blue-500' : 'text-slate-500'}`}>{getDayName(day)}</div>
-                      <div className={`text-xl font-bold mt-1 ${isToday ? 'text-blue-700' : 'text-slate-700'}`}>{day.getDate()}</div>
-                    </div>
-                    <div onClick={() => { setSelectedDate(day); setView('day'); }} className="px-2 py-2 min-h-[40px] border-b border-slate-50 cursor-pointer hover:bg-slate-50">
-                      {data?.event ? <div className="text-xs bg-red-50 text-red-600 border border-red-100 px-1.5 py-0.5 rounded mb-1 font-medium text-center line-clamp-2">{data.event}</div> : <div className="text-[10px] text-slate-300 text-center py-1">行事なし</div>}
-                    </div>
-                    <div className="flex-1 p-2 space-y-2 overflow-y-auto">
-                      {PERIODS.map(period => {
-                        const pData = data?.periods?.[period.id];
-                        const hasContent = pData && (pData.subject || pData.plan || pData.result);
-                        const subj = pData?.subject ? subjects.find(s => s.name === pData.subject) : null;
-                        
-                        let containerClass = "min-h-[60px]";
-                        let bgClass = "";
-                        if (hasContent) {
-                          if (period.type === 'submission') bgClass = "bg-red-50 border-red-200 text-red-700";
-                          else if (period.type === 'hr') bgClass = "bg-orange-100 border-orange-200 text-orange-800";
-                          else if (period.type === 'break') bgClass = "bg-slate-200 border-slate-300 text-slate-700";
-                          else if (subj) bgClass = subj.color;
-                          else bgClass = "bg-white border-slate-200";
-                        } else {
-                          if (period.type === 'submission') bgClass = "bg-slate-50/30 border-slate-200 text-slate-400";
-                          else if (period.type === 'hr') bgClass = "bg-orange-50/30 border-orange-100 border-dashed text-orange-300";
-                          else if (period.type === 'break') bgClass = "bg-slate-100 text-slate-400 border-transparent";
-                          else bgClass = "bg-slate-50/50 border-dashed border-slate-300 text-slate-400";
-                        }
-                        if (period.type === 'submission') containerClass = "min-h-[36px] mb-2";
-                        else if (period.type === 'hr') containerClass = "min-h-[40px]";
-                        else if (period.type === 'break') containerClass = "min-h-[30px] border-transparent";
-
-                        return (
-                          <div key={period.id} onClick={() => setQuickMenu({ dateKey, periodId: period.id, label: period.label, type: period.type })} className={`relative text-xs p-1.5 rounded border flex flex-col cursor-pointer transition-all hover:ring-2 hover:ring-blue-300 ${containerClass} ${bgClass}`}>
-                            <div className="flex justify-between items-center mb-0.5">
-                              <span className={`font-bold opacity-70 flex items-center gap-1 ${period.type === 'class' ? 'border-b border-current pb-0.5' : ''}`}>{period.icon}{period.label}</span>
-                              {period.type === 'class' && <div className="font-bold text-[10px] ml-1 text-right leading-tight truncate max-w-[50px]">{pData?.subject || <span className="opacity-30"></span>}</div>}
-                            </div>
-                            {pData?.plan ? <div className={`opacity-90 text-[11px] leading-tight line-clamp-2 mt-0.5 ${period.type === 'submission' ? 'font-bold' : ''}`}>{pData.plan}</div> : <div className="flex-1"></div>}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        );
-      };
-
-      // 5. Month View
-      const renderMonthView = () => {
-        const days = getDaysInMonth(currentDate.getFullYear(), currentDate.getMonth());
-        const blanks = Array(days[0].getDay()).fill(null);
-        const displayPeriods = PERIODS.filter(p => p.type === 'class');
-
-        return (
-          <div className="h-full flex flex-col">
-            {/* 新規追加: 月表示用ヘッダー */}
-            <div className="flex items-center justify-between mb-2 px-1">
-              <h2 className="text-xl font-bold text-slate-700">
-                {currentDate.getFullYear()}年 {currentDate.getMonth() + 1}月
-              </h2>
-              <div className="flex gap-1">
-                 <button onClick={handlePrev} className="p-1.5 hover:bg-slate-100 rounded text-slate-500"><ChevronLeft /></button>
-                 <button onClick={goToToday} className="px-3 py-1.5 text-xs bg-slate-100 rounded hover:bg-slate-200 font-bold text-slate-600">今月</button>
-                 <button onClick={handleNext} className="p-1.5 hover:bg-slate-100 rounded text-slate-500"><ChevronRight /></button>
-              </div>
-            </div>
-
-            <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex-1 flex flex-col">
-              <div className="grid grid-cols-7 bg-slate-50 border-b border-slate-200">
-                {['日', '月', '火', '水', '木', '金', '土'].map((d, i) => <div key={i} className={`py-3 text-center font-bold text-sm ${i === 0 ? 'text-red-300' : i === 6 ? 'text-blue-500' : 'text-slate-600'}`}>{d}</div>)}
-              </div>
-              <div className="grid grid-cols-7 auto-rows-fr flex-1">
-                {blanks.map((_, i) => <div key={`blank-${i}`} className="border-b border-r border-slate-100 bg-slate-50/30" />)}
-                {days.map(day => {
-                  const dateKey = formatDateKey(day);
-                  const data = scheduleData[dateKey];
-                  const isToday = formatDateKey(new Date()) === dateKey;
-                  const isSunday = day.getDay() === 0;
-                  return (
-                    <div key={dateKey} onClick={() => { setSelectedDate(day); setView('day'); }} className={`border-b border-r border-slate-100 p-2 cursor-pointer transition relative ${isSunday ? 'bg-slate-50 opacity-60' : 'hover:bg-slate-50'} ${isToday ? 'bg-blue-50/50' : ''}`}>
-                      <div className={`text-sm font-medium mb-1 inline-block w-6 h-6 text-center leading-6 rounded-full ${isToday ? 'bg-blue-600 text-white' : isSunday ? 'text-red-300' : 'text-slate-700'}`}>{day.getDate()}</div>
-                      {data?.event && <div className="text-xs bg-red-100 text-red-700 px-1 py-0.5 rounded truncate mb-1">{data.event}</div>}
-                      {!isSunday && <div className="space-y-0.5 overflow-hidden h-16">
-                          {displayPeriods.map(period => {
-                            const pData = data?.periods?.[period.id];
-                            if (!pData || !pData.subject) return null;
-                            const subj = subjects.find(s => s.name === pData.subject);
-                            return (
-                              <div key={period.id} className="flex items-center text-[10px]">
-                                <span className="w-3 text-slate-400 mr-0.5">{period.shortLabel}</span>
-                                <div className={`w-2 h-2 rounded-full mr-1 ${subj ? subj.color.split(' ')[0] : 'bg-gray-300'}`}></div>
-                                <span className="truncate text-slate-600">{pData.subject}</span>
-                              </div>
-                            );
-                          })}
-                        </div>}
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          </div>
-        );
-      };
-
-      // 6. Day View
-      const renderDayView = () => {
-        const dateKey = formatDateKey(selectedDate);
-        const data = getDayData(selectedDate);
-        return (
-          <div className="max-w-4xl mx-auto space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-300">
-            <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
-                  <span className="bg-slate-800 text-white px-3 py-1 rounded-lg text-lg">{selectedDate.getMonth() + 1}/{selectedDate.getDate()}</span>
-                  <span className="text-slate-500 text-lg">({getDayName(selectedDate)}) の記録</span>
-                </h2>
-                <div className="flex gap-2">
-                    <button onClick={() => { const p = new Date(selectedDate); p.setDate(p.getDate() - 1); setSelectedDate(p); }} className="p-2 hover:bg-slate-100 rounded-full text-slate-500"><ChevronLeft size={20} /></button>
-                    <button onClick={() => { const n = new Date(selectedDate); n.setDate(n.getDate() + 1); setSelectedDate(n); }} className="p-2 hover:bg-slate-100 rounded-full text-slate-500"><ChevronRight size={20} /></button>
-                </div>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="space-y-2">
-                  <label className="text-sm font-bold text-slate-500 flex items-center gap-1"><ClipboardList size={16} /> 行事・特記事項</label>
-                  <input type="text" value={data.event || ''} onChange={(e) => updateDayData(dateKey, 'event', e.target.value)} placeholder="例：避難訓練" className="w-full p-3 bg-slate-50 border border-slate-200 rounded-lg" />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-bold text-slate-500 flex items-center gap-1"><CheckCircle2 size={16} /> To Do</label>
-                  <input type="text" value={data.todo || ''} onChange={(e) => updateDayData(dateKey, 'todo', e.target.value)} placeholder="例：提出物確認" className="w-full p-3 bg-slate-50 border border-slate-200 rounded-lg" />
-                </div>
-              </div>
-            </div>
-            <div className="space-y-4">
-              {PERIODS.map(period => {
-                const pData = data?.periods?.[period.id] || { subject: '', plan: '', result: '' };
-                const subj = subjects.find(s => s.name === pData.subject);
-                let headerBg = subj ? subj.color.replace('text-', 'bg-opacity-20 ') : 'bg-slate-50';
-                if (period.type === 'break' && !subj) headerBg = 'bg-slate-100';
-                if (period.type === 'submission') headerBg = 'bg-red-50 text-red-700';
-                if (period.type === 'hr') headerBg = 'bg-orange-50 text-orange-800';
-                const textAreaHeight = period.type === 'hr' ? 'h-64' : 'h-24';
-
-                return (
-                  <div key={period.id} className={`bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden`}>
-                    <div className={`flex items-center p-4 ${headerBg}`}>
-                      <div className={`w-12 h-12 flex items-center justify-center bg-white rounded-full font-bold text-slate-700 shadow-sm mr-4 border border-slate-100 ${period.type === 'class' ? 'text-xl' : 'text-sm'}`}>{period.shortLabel}</div>
-                      <div className="flex-1">
-                        {period.type === 'class' && <div className="flex flex-wrap gap-2 mb-2">{subjects.map(s => <button key={s.id} onClick={() => toggleSubject(dateKey, period.id, s.name)} className={`px-3 py-1 rounded-full text-xs font-bold transition-all ${pData.subject === s.name ? `${s.color} ring-2 ring-offset-1` : 'bg-white text-slate-400 border border-slate-200'}`}>{s.name}</button>)}</div>}
-                        {period.type !== 'class' && <div className="font-bold">{period.type === 'submission' ? '提出物' : (period.type === 'hr' ? '連絡' : '内容')}</div>}
-                      </div>
-                      <div className="text-slate-400 font-bold text-sm ml-2">{period.label}</div>
-                    </div>
-                    {period.type === 'class' ? (
-                      <div className="grid grid-cols-1 md:grid-cols-2 divide-y md:divide-y-0 md:divide-x divide-slate-100">
-                        <div className="p-4 bg-white">
-                          <label className="block text-xs font-bold text-slate-400 mb-2">予定</label>
-                          <textarea value={pData.plan} onChange={(e) => updatePeriodData(dateKey, period.id, 'plan', e.target.value)} placeholder="予定..." className={`w-full ${textAreaHeight} p-3 text-sm bg-slate-50/50 border border-slate-200 rounded-lg`} />
-                        </div>
-                        <div className="p-4 bg-white">
-                          <label className="block text-xs font-bold text-slate-400 mb-2">実績</label>
-                          <textarea value={pData.result} onChange={(e) => updatePeriodData(dateKey, period.id, 'result', e.target.value)} placeholder="実績..." className={`w-full ${textAreaHeight} p-3 text-sm bg-slate-50/50 border border-slate-200 rounded-lg`} />
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="p-4 bg-white">
-                        <label className="block text-xs font-bold text-slate-400 mb-2">内容</label>
-                        <textarea value={pData.plan} onChange={(e) => updatePeriodData(dateKey, period.id, 'plan', e.target.value)} placeholder="内容..." className={`w-full ${textAreaHeight} p-3 text-sm bg-slate-50/50 border border-slate-200 rounded-lg`} />
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-            <div className="h-12"></div>
-          </div>
-        );
-      };
-
-      // 7. History View
-      const renderHistoryView = () => {
-        const subjectCounts = calculateSubjectCounts();
-        const historyList = [];
-        Object.keys(scheduleData).forEach(dateKey => {
-          const dayData = scheduleData[dateKey];
-          if (dayData.periods) {
-            PERIODS.forEach(period => {
-              const pData = dayData.periods[period.id];
-              if (!pData) return;
-              const targetSubjName = subjects.find(s => s.id === selectedSubjectHistory)?.name;
-              if (pData.subject === targetSubjName && (pData.plan || pData.result)) {
-                historyList.push({ date: dateKey, periodLabel: period.label, periodShort: period.shortLabel, ...pData });
-              }
-            });
-          }
-        });
-        historyList.sort((a, b) => new Date(b.date) - new Date(a.date));
-        const currentSubj = subjects.find(s => s.id === selectedSubjectHistory);
-
-        return (
-          <div className="max-w-4xl mx-auto space-y-6">
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
-              <h2 className="text-lg font-bold text-slate-700 mb-4 flex items-center gap-2"><Calculator size={20} /> 授業数</h2>
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
-                {subjects.map(s => <div key={s.id} className={`p-3 rounded-lg border ${s.color.replace('text-', 'border-').replace('bg-', 'bg-opacity-10 ')}`}><div className="text-xs font-bold opacity-70 mb-1">{s.name}</div><div className="text-2xl font-bold">{subjectCounts[s.name]}<span className="text-xs font-normal ml-1 opacity-60">回</span></div></div>)}
-              </div>
-            </div>
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 min-h-[600px] flex flex-col">
-              <div className="p-6 border-b border-slate-100 bg-slate-50/50 rounded-t-2xl">
-                <h2 className="text-lg font-bold text-slate-700 mb-4 flex items-center gap-2"><BookOpen size={20} /> 科目別記録</h2>
-                <div className="flex overflow-x-auto pb-2 gap-2 no-scrollbar">
-                  {subjects.map(s => <button key={s.id} onClick={() => setSelectedSubjectHistory(s.id)} className={`flex-shrink-0 px-4 py-2 rounded-full text-sm font-bold transition-all ${selectedSubjectHistory === s.id ? `${s.color} shadow-sm ring-1 ring-slate-200` : 'bg-white text-slate-500 border border-slate-200 hover:bg-slate-100'}`}>{s.name}</button>)}
-                </div>
-              </div>
-              <div className="flex-1 p-6 overflow-y-auto">
-                {historyList.length === 0 ? <div className="text-center text-slate-400 py-20"><ClipboardList className="mx-auto mb-4 opacity-20" size={48} /><p>記録なし</p></div> : 
-                  <div className="relative border-l-2 border-slate-100 ml-4 space-y-8">
-                    {historyList.map((item) => (
-                      <div key={`${item.date}-${item.periodLabel}`} className="relative pl-8">
-                        <div className={`absolute -left-[9px] top-0 w-4 h-4 rounded-full border-2 border-white shadow-sm ${currentSubj?.color?.split(' ')[0] || 'bg-gray-300'}`}></div>
-                        <div className="mb-1 text-sm text-slate-400 font-mono flex items-center gap-2">{item.date} <span className="text-xs bg-slate-100 px-1.5 rounded text-slate-500">{item.periodLabel}</span></div>
-                        <div className="bg-slate-50 rounded-lg p-4 border border-slate-100 hover:border-slate-300 transition-colors group">
-                           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                              <div><div className="text-xs font-bold text-slate-400 mb-1">Plan</div><p className="text-slate-700 whitespace-pre-wrap">{item.plan || <span className="text-slate-300 italic">なし</span>}</p></div>
-                              <div className="md:border-l md:border-slate-200 md:pl-4"><div className="text-xs font-bold text-green-600/70 mb-1">Result</div><p className="text-slate-700 whitespace-pre-wrap">{item.result || <span className="text-slate-300 italic">なし</span>}</p></div>
-                           </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
+        if (useCloud) {
+            try {
+                if (!firebase.apps.length) {
+                    firebase.initializeApp(activeConfig);
                 }
-              </div>
-            </div>
-          </div>
-        );
-      };
+                db = firebase.firestore();
+                auth = firebase.auth();
+            } catch (e) {
+                console.error("Firebase init error:", e);
+                alert("Firebaseの設定に誤りがある可能性があります。コンソールを確認してください。");
+            }
+        }
 
-      // --- Main Render ---
-      return (
-        <div className="min-h-screen bg-slate-50 text-slate-800 font-sans selection:bg-blue-100 pb-20">
-          {renderQuickMenu()} {renderCloudModal()} {renderSettingsModal()}
-          
-          <nav className="bg-white border-b border-slate-200 sticky top-0 z-50 shadow-sm px-4 h-16 flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-slate-800 rounded-lg flex items-center justify-center text-white font-bold text-xl shadow-lg">{className}</div>
-              <h1 className="font-bold text-lg hidden sm:block text-slate-700">週案マネージャー</h1>
-            </div>
-            <div className="flex items-center bg-slate-100 p-1 rounded-lg">
-              <button onClick={() => { setView('week'); goToToday(); }} className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all flex items-center gap-1 ${view === 'week' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}><Calendar size={16} /> 週</button>
-              <button onClick={() => { setView('month'); goToToday(); }} className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all flex items-center gap-1 ${view === 'month' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}><Calendar size={16} /> 月</button>
-              <button onClick={() => setView('history')} className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all flex items-center gap-1 ${view === 'history' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}><List size={16} /> リスト</button>
-            </div>
-            <div className="flex gap-2">
-               <button onClick={()=>setShowSettingsModal(true)} className="p-2 bg-slate-100 rounded"><Settings size={20}/></button>
-               <button onClick={()=>setShowCloudModal(true)} className={`p-2 rounded border ${isFirebaseReady ? 'bg-blue-50 text-blue-600' : 'bg-slate-100 text-slate-400'}`}><Cloud size={20}/></button>
-            </div>
-          </nav>
+        const { useState, useEffect, useMemo, useCallback, useRef } = React;
 
-          <main className="p-4 sm:p-6 max-w-[1600px] mx-auto h-[calc(100vh-80px)] overflow-hidden flex flex-col">
-             {view === 'week' && renderWeekView()}
-             {view === 'month' && renderMonthView()}
-             {view === 'day' && renderDayView()}
-             {view === 'history' && renderHistoryView()}
-          </main>
-          <div className="fixed bottom-6 right-6 pointer-events-none opacity-0 transition-opacity duration-500" id="save-indicator">
-            <div className="bg-slate-800 text-white px-4 py-2 rounded-full shadow-lg flex items-center gap-2"><CheckCircle2 size={16} className="text-green-400" /> 保存しました</div>
-          </div>
-        </div>
-      );
-    }
+        // --- Constants & Helper Functions ---
 
-    const root = createRoot(document.getElementById('root'));
-    root.render(
-      <ErrorBoundary>
-        <WeeklyLessonPlanner />
-      </ErrorBoundary>
-    );
-  </script>
+        const APP_VERSION = "v3.0";
+        const WEEK_DAYS = ['月', '火', '水', '木', '金', '土'];
+        
+        const COLOR_PALETTE = {
+            red: { label: '赤', bg: 'bg-red-500', bgLight: 'bg-red-100', text: 'text-red-800', border: 'border-red-600', ring: 'ring-red-500' },
+            orange: { label: '橙', bg: 'bg-orange-500', bgLight: 'bg-orange-100', text: 'text-orange-800', border: 'border-orange-600', ring: 'ring-orange-500' },
+            yellow: { label: '黄', bg: 'bg-yellow-400', bgLight: 'bg-yellow-100', text: 'text-yellow-800', border: 'border-yellow-500', ring: 'ring-yellow-400' },
+            green: { label: '緑', bg: 'bg-green-500', bgLight: 'bg-green-100', text: 'text-green-800', border: 'border-green-600', ring: 'ring-green-500' },
+            blue: { label: '青', bg: 'bg-blue-500', bgLight: 'bg-blue-100', text: 'text-blue-800', border: 'border-blue-600', ring: 'ring-blue-500' },
+            indigo: { label: '藍', bg: 'bg-indigo-500', bgLight: 'bg-indigo-100', text: 'text-indigo-800', border: 'border-indigo-600', ring: 'ring-indigo-500' },
+            purple: { label: '紫', bg: 'bg-purple-500', bgLight: 'bg-purple-100', text: 'text-purple-800', border: 'border-purple-600', ring: 'ring-purple-500' },
+            gray: { label: '灰', bg: 'bg-gray-500', bgLight: 'bg-gray-100', text: 'text-gray-800', border: 'border-gray-600', ring: 'ring-gray-500' },
+        };
+
+        const DEFAULT_CLASSES = [
+            { name: '1A', color: 'red' }, { name: '1B', color: 'red' },
+            { name: '2A', color: 'blue' }, { name: '2B', color: 'blue' },
+            { name: '3A', color: 'green' }, { name: '3B', color: 'green' },
+            { name: '道徳', color: 'yellow' }, { name: '総学', color: 'orange' },
+            { name: 'HR', color: 'indigo' }, { name: '監督', color: 'gray' }, { name: 'その他', color: 'gray' }
+        ];
+
+        const TIME_SLOTS = [
+            { id: 'morning', label: '朝・行事', type: 'special', height: 'h-24' },
+            { id: '1', label: '1限', type: 'class', height: 'h-32' },
+            { id: '2', label: '2限', type: 'class', height: 'h-32' },
+            { id: '3', label: '3限', type: 'class', height: 'h-32' },
+            { id: '4', label: '4限', type: 'class', height: 'h-32' },
+            { id: 'lunch', label: '昼休み', type: 'break', height: 'h-12' },
+            { id: '5', label: '5限', type: 'class', height: 'h-32' },
+            { id: '6', label: '6限', type: 'class', height: 'h-32' },
+            { id: '7', label: '7限', type: 'class', height: 'h-32' },
+            { id: 'after', label: '帰りHR', type: 'special', height: 'h-16' },
+            { id: 'memo', label: 'メモ', type: 'memo', height: 'h-24' },
+        ];
+
+        const formatDateKey = (date) => {
+            const d = new Date(date);
+            return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+        };
+
+        const getMonday = (d) => {
+            d = new Date(d);
+            const day = d.getDay();
+            const diff = d.getDate() - day + (day === 0 ? -6 : 1); 
+            return new Date(d.setDate(diff));
+        };
+
+        const generateId = () => Math.random().toString(36).substring(2, 10).toUpperCase();
+
+        const guessColor = (name) => {
+            if (name.startsWith('1')) return 'red';
+            if (name.startsWith('2')) return 'blue';
+            if (name.startsWith('3')) return 'green';
+            if (name.includes('道徳')) return 'yellow';
+            if (name.includes('HR')) return 'indigo';
+            return 'gray';
+        };
+
+        // Icons
+        const Icons = {
+            ChevronLeft: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6"/></svg>,
+            ChevronRight: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m9 18 6-6-6-6"/></svg>,
+            Calendar: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="18" height="18" x="3" y="4" rx="2" ry="2"/><line x1="16" x2="16" y1="2" y2="6"/><line x1="8" x2="8" y1="2" y2="6"/><line x1="3" x2="21" y1="10" y2="10"/></svg>,
+            List: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="8" x2="21" y1="6" y2="6"/><line x1="8" x2="21" y1="12" y2="12"/><line x1="8" x2="21" y1="18" y2="18"/><line x1="3" x2="3.01" y1="6" y2="6"/><line x1="3" x2="3.01" y1="12" y2="12"/><line x1="3" x2="3.01" y1="18" y2="18"/></svg>,
+            Settings: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.09a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>,
+            Download: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>,
+            Upload: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" x2="12" y1="3" y2="15"/></svg>,
+            X: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>,
+            BarChart: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" x2="12" y1="20" y2="10"/><line x1="18" x2="18" y1="20" y2="4"/><line x1="6" x2="6" y1="20" y2="16"/></svg>,
+            Cloud: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17.5 19c0-3.037-2.463-5.5-5.5-5.5S6.5 15.963 6.5 19"/><path d="M20 16.952c1.235-.976 2-2.528 2-4.162 0-2.761-2.238-5-5-5-.403 0-.792.051-1.168.146C15.394 5.378 13.068 4 10.5 4 6.91 4 4 6.91 4 10.5c0 1.637.595 3.125 1.583 4.29"/></svg>,
+            Plus: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" x2="12" y1="5" y2="19"/><line x1="5" x2="19" y1="12" y2="12"/></svg>,
+            Trash: () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>,
+            DownloadCloud: () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 14.899A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242"/><path d="M12 12v9"/><path d="m8 17 4 4 4-4"/></svg>,
+            Printer: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect width="12" height="8" x="6" y="14"/></svg>,
+            Search: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" x2="16.65" y1="21" y2="16.65"/></svg>,
+        };
+
+        // --- Components ---
+
+        const ClassSelector = ({ selectedClass, onSelect, classes }) => {
+            const getButtonStyle = (clsObj) => {
+                const base = "px-3 py-2 rounded-lg text-sm font-bold border transition-all shadow-sm ";
+                const isSelected = selectedClass === clsObj.name;
+                const colorTheme = COLOR_PALETTE[clsObj.color || 'gray'];
+                
+                let colorClass = "";
+                if (isSelected) {
+                    colorClass = `${colorTheme.bg} text-white ${colorTheme.border} ring-2 ring-offset-1 ${colorTheme.ring} transform scale-105 z-10`;
+                } else {
+                    colorClass = `${colorTheme.bgLight} ${colorTheme.text} border-gray-200 opacity-80 hover:opacity-100 hover:scale-105`;
+                }
+
+                return `${base} ${colorClass}`;
+            };
+
+            return (
+                <div className="flex flex-wrap gap-2">
+                    {classes.map((c, idx) => (
+                        <button
+                            key={`${c.name}-${idx}`}
+                            onClick={() => onSelect(c.name)}
+                            className={getButtonStyle(c)}
+                        >
+                            {c.name}
+                        </button>
+                    ))}
+                </div>
+            );
+        };
+
+        const SlotModal = ({ isOpen, onClose, date, slotId, data, onSave, classOptions }) => {
+            if (!isOpen) return null;
+
+            const slotDef = TIME_SLOTS.find(s => s.id === slotId);
+            const isClassSlot = slotDef?.type === 'class';
+            const defaultClassId = classOptions.length > 0 ? classOptions[0].name : '';
+            const initialData = data || { plan: '', actual: '', classId: isClassSlot ? defaultClassId : '', memo: '' };
+
+            const [localData, setLocalData] = useState(initialData);
+
+            useEffect(() => {
+                let loadedData = data || { plan: '', actual: '', classId: isClassSlot ? defaultClassId : '', memo: '' };
+                if (!isClassSlot && loadedData.actual && !loadedData.plan.includes(loadedData.actual)) {
+                    loadedData = { 
+                        ...loadedData, 
+                        plan: loadedData.plan ? `${loadedData.plan}\n\n---\n${loadedData.actual}` : loadedData.actual,
+                        actual: ''
+                    };
+                }
+                setLocalData(loadedData);
+            }, [data, slotId, isClassSlot, defaultClassId, isOpen]);
+
+            const handleChange = (field, value) => {
+                setLocalData(prev => ({ ...prev, [field]: value }));
+            };
+
+            const handleSave = () => {
+                onSave(date, slotId, localData);
+                onClose();
+            };
+            
+            const handleClassSelect = (clsName) => {
+                if (localData.classId === clsName) {
+                    handleChange('classId', '');
+                } else {
+                    handleChange('classId', clsName);
+                }
+            };
+
+            const dateStr = new Date(date).toLocaleDateString('ja-JP', { month: 'long', day: 'numeric', weekday: 'long' });
+
+            return (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4" onClick={onClose}>
+                    <div className="bg-white rounded-xl w-full max-w-lg shadow-2xl overflow-hidden h-[80vh] flex flex-col" onClick={e => e.stopPropagation()}>
+                        <div className="p-4 border-b flex justify-between items-center bg-gray-800 text-white shrink-0">
+                            <div>
+                                <h2 className="text-lg font-bold">{dateStr}</h2>
+                                <span className="text-sm bg-gray-700 px-2 py-0.5 rounded text-gray-200">{slotDef?.label}</span>
+                            </div>
+                            <button onClick={onClose} className="hover:bg-gray-700 p-2 rounded-full transition"><Icons.X /></button>
+                        </div>
+                        
+                        <div className="p-5 overflow-y-auto custom-scrollbar flex-1 flex flex-col">
+                            {isClassSlot ? (
+                                <>
+                                    <div className="mb-6 shrink-0">
+                                        <label className="block text-xs font-bold text-gray-500 mb-2 uppercase tracking-wide">クラス選択（タップで解除）</label>
+                                        <ClassSelector 
+                                            selectedClass={localData.classId} 
+                                            onSelect={handleClassSelect} 
+                                            classes={classOptions} 
+                                        />
+                                    </div>
+
+                                    <div className="space-y-4">
+                                        <div className="space-y-1">
+                                            <div className="flex items-center justify-between">
+                                                <label className="text-sm font-bold text-gray-700">予定 (Plan)</label>
+                                            </div>
+                                            <textarea 
+                                                className="w-full border-2 border-gray-200 rounded-lg p-3 text-base min-h-[100px] focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                                                placeholder="指導のねらい、活動内容..."
+                                                value={localData.plan || ''}
+                                                onChange={(e) => handleChange('plan', e.target.value)}
+                                            />
+                                        </div>
+                                        
+                                        <div className="space-y-1">
+                                            <label className="text-sm font-bold text-gray-700">実施記録・振り返り (Actual)</label>
+                                            <textarea 
+                                                className="w-full border-2 border-yellow-100 bg-yellow-50 rounded-lg p-3 text-base min-h-[80px] focus:ring-2 focus:ring-yellow-400 focus:border-transparent transition-all"
+                                                placeholder="生徒の様子、変更点、メモ..."
+                                                value={localData.actual || ''}
+                                                onChange={(e) => handleChange('actual', e.target.value)}
+                                            />
+                                        </div>
+                                    </div>
+                                </>
+                            ) : (
+                                <div className="flex-1 flex flex-col h-full">
+                                    <label className="block text-sm font-bold text-gray-700 mb-2">内容</label>
+                                    <textarea 
+                                        className="w-full border-2 border-gray-200 rounded-lg p-4 text-base flex-1 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all resize-none leading-relaxed"
+                                        placeholder="内容、連絡事項、行事の詳細など..."
+                                        value={localData.plan || ''}
+                                        onChange={(e) => handleChange('plan', e.target.value)}
+                                    />
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="p-4 border-t bg-gray-50 flex justify-end gap-3 shrink-0">
+                            <button onClick={onClose} className="px-5 py-2.5 rounded-lg text-gray-600 hover:bg-gray-200 font-medium transition">キャンセル</button>
+                            <button onClick={handleSave} className="px-8 py-2.5 rounded-lg bg-blue-600 text-white hover:bg-blue-700 font-bold shadow-md transform active:scale-95 transition">
+                                保存
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        const SettingsModal = ({ isOpen, onClose, classes, onUpdateClasses, syncId, onUpdateSyncId, onTriggerSync, isSyncing, teacherTitle, onUpdateTeacherTitle }) => {
+            if (!isOpen) return null;
+            const [localClasses, setLocalClasses] = useState([...classes]);
+            const [localSyncId, setLocalSyncId] = useState(syncId);
+            const [localTeacherTitle, setLocalTeacherTitle] = useState(teacherTitle);
+
+            useEffect(() => {
+                setLocalClasses([...classes]);
+            }, [classes]);
+
+            useEffect(() => {
+                setLocalTeacherTitle(teacherTitle);
+            }, [teacherTitle]);
+
+            const handleSave = () => {
+                const filtered = localClasses.filter(c => c.name.trim() !== '');
+                onUpdateClasses(filtered);
+                onUpdateSyncId(localSyncId);
+                onUpdateTeacherTitle(localTeacherTitle);
+                onClose();
+            };
+            
+            const handleSyncClick = () => {
+                onUpdateSyncId(localSyncId);
+                onTriggerSync(localSyncId);
+            };
+
+            const addClass = () => {
+                setLocalClasses([...localClasses, { name: '', color: 'gray' }]);
+            };
+
+            const removeClass = (index) => {
+                const newClasses = [...localClasses];
+                newClasses.splice(index, 1);
+                setLocalClasses(newClasses);
+            };
+
+            const updateClass = (index, field, value) => {
+                const newClasses = [...localClasses];
+                newClasses[index] = { ...newClasses[index], [field]: value };
+                setLocalClasses(newClasses);
+            };
+
+            return (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                    <div className="bg-white rounded-lg p-6 w-full max-w-lg max-h-[90vh] flex flex-col">
+                        <h2 className="text-xl font-bold mb-4 flex items-center gap-2 flex-shrink-0"><Icons.Settings size={20}/> 設定</h2>
+                        
+                        <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 space-y-6">
+                            
+                            {/* Title Settings Section */}
+                            <div className="mb-4">
+                                <label className="block text-sm font-bold text-gray-700 mb-2">肩書き・担任名</label>
+                                <div className="flex gap-2">
+                                    <input 
+                                        type="text"
+                                        className="w-full border-2 border-gray-200 rounded p-2 text-base focus:ring-2 focus:ring-blue-500"
+                                        value={localTeacherTitle}
+                                        onChange={(e) => setLocalTeacherTitle(e.target.value)}
+                                        placeholder="例: 1年A組 担任"
+                                    />
+                                </div>
+                                <p className="text-xs text-gray-400 mt-1">ヘッダー部分に表示されます。</p>
+                            </div>
+
+                            {/* Sync Section */}
+                            <div className="bg-blue-50 p-4 rounded-lg border border-blue-100">
+                                <h3 className="font-bold text-blue-800 text-sm mb-2 flex items-center gap-1"><Icons.Cloud size={16}/> クラウド同期 (iPad連携)</h3>
+                                <p className="text-xs text-blue-600 mb-2">
+                                    【注意】IDがわかれば誰でも閲覧可能です。生徒の氏名や成績など、機微な個人情報は絶対に入力しないでください。
+                                </p>
+                                <div className="flex gap-2 items-center">
+                                    <input 
+                                        type="text"
+                                        className="flex-1 border-2 border-blue-200 rounded p-2 text-center font-mono font-bold text-lg tracking-widest text-blue-900 focus:ring-2 focus:ring-blue-500"
+                                        value={localSyncId}
+                                        onChange={(e) => setLocalSyncId(e.target.value)}
+                                        placeholder="SYNC_ID"
+                                    />
+                                    <button 
+                                        onClick={handleSyncClick}
+                                        disabled={isSyncing}
+                                        className={`px-3 py-2 rounded font-bold text-sm text-white flex items-center gap-1 whitespace-nowrap shadow-sm transition
+                                            ${isSyncing ? 'bg-gray-400 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700 active:scale-95'}
+                                        `}
+                                    >
+                                        <Icons.DownloadCloud size={16} /> 
+                                        {isSyncing ? '受信中...' : 'データ受信'}
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* Class Settings Section */}
+                            <div>
+                                <div className="flex justify-between items-center mb-2">
+                                    <label className="block text-sm font-bold text-gray-700">クラス・科目設定</label>
+                                    <button onClick={addClass} className="flex items-center gap-1 text-xs bg-green-100 text-green-700 px-2 py-1 rounded hover:bg-green-200 font-bold">
+                                        <Icons.Plus size={14} /> 追加
+                                    </button>
+                                </div>
+                                
+                                <div className="space-y-2">
+                                    {localClasses.map((cls, idx) => (
+                                        <div key={idx} className="flex gap-2 items-center">
+                                            <input 
+                                                type="text" 
+                                                placeholder="クラス名"
+                                                className="border rounded p-2 flex-1 text-sm"
+                                                value={cls.name}
+                                                onChange={(e) => updateClass(idx, 'name', e.target.value)}
+                                            />
+                                            <select 
+                                                className={`border rounded p-2 text-sm w-24 cursor-pointer font-medium ${COLOR_PALETTE[cls.color]?.text} ${COLOR_PALETTE[cls.color]?.bgLight}`}
+                                                value={cls.color}
+                                                onChange={(e) => updateClass(idx, 'color', e.target.value)}
+                                            >
+                                                {Object.keys(COLOR_PALETTE).map(key => (
+                                                    <option key={key} value={key}>
+                                                        {COLOR_PALETTE[key].label}
+                                                    </option>
+                                                ))}
+                                            </select>
+                                            <button 
+                                                onClick={() => removeClass(idx)}
+                                                className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded"
+                                            >
+                                                <Icons.Trash />
+                                            </button>
+                                        </div>
+                                    ))}
+                                    {localClasses.length === 0 && (
+                                        <div className="text-center text-gray-400 text-xs py-4 border-2 border-dashed rounded">
+                                            設定されているクラスがありません。<br/>「追加」ボタンを押してください。
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="flex justify-end gap-2 mt-4 pt-4 border-t flex-shrink-0">
+                            <button onClick={onClose} className="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300 transition">キャンセル</button>
+                            <button onClick={handleSave} className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 shadow font-bold transition">保存</button>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        const ClassHistoryView = ({ data, classes }) => {
+            const [selectedClass, setSelectedClass] = useState(classes[0]?.name || '1A');
+            const [searchTerm, setSearchTerm] = useState("");
+
+            const history = useMemo(() => {
+                const list = [];
+                Object.keys(data).sort().reverse().forEach(dateKey => {
+                    const dayData = data[dateKey];
+                    Object.keys(dayData).forEach(slotId => {
+                        const slot = dayData[slotId];
+                        // Filter logic
+                        const matchesClass = selectedClass === 'ALL' || slot.classId === selectedClass;
+                        const matchesSearch = searchTerm === "" || 
+                                              (slot.plan && slot.plan.includes(searchTerm)) || 
+                                              (slot.actual && slot.actual.includes(searchTerm));
+
+                        if (matchesClass && matchesSearch && (slot.plan || slot.actual)) {
+                            list.push({
+                                date: dateKey,
+                                period: TIME_SLOTS.find(t => t.id === slotId)?.label || slotId,
+                                plan: slot.plan,
+                                actual: slot.actual,
+                                classId: slot.classId
+                            });
+                        }
+                    });
+                });
+                return list;
+            }, [data, selectedClass, searchTerm]);
+
+            return (
+                <div className="bg-white rounded shadow p-4 h-full overflow-hidden flex flex-col">
+                    <div className="flex flex-col md:flex-row justify-between items-center mb-4 border-b pb-4 gap-4">
+                        <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
+                            <Icons.List /> 
+                            指導記録検索
+                        </h2>
+                        <div className="flex gap-2 w-full md:w-auto">
+                            <div className="relative flex-1">
+                                <Icons.Search className="absolute left-2 top-2.5 text-gray-400" size={16} />
+                                <input 
+                                    type="text" 
+                                    placeholder="キーワード検索..." 
+                                    className="pl-8 border p-2 rounded shadow-sm w-full"
+                                    value={searchTerm}
+                                    onChange={(e) => setSearchTerm(e.target.value)}
+                                />
+                            </div>
+                            <select 
+                                value={selectedClass} 
+                                onChange={(e) => setSelectedClass(e.target.value)}
+                                className="border p-2 rounded shadow-sm"
+                            >
+                                <option value="ALL">全クラス</option>
+                                {classes.map((c, idx) => <option key={idx} value={c.name}>{c.name}</option>)}
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div className="flex-1 overflow-auto custom-scrollbar">
+                        {history.length === 0 ? (
+                            <div className="text-center text-gray-400 py-10">履歴がありません</div>
+                        ) : (
+                            <table className="w-full text-left border-collapse">
+                                <thead className="bg-gray-100 sticky top-0">
+                                    <tr>
+                                        <th className="p-3 border-b font-medium w-32">日付・時限</th>
+                                        {selectedClass === 'ALL' && <th className="p-3 border-b font-medium w-24">クラス</th>}
+                                        <th className="p-3 border-b font-medium">予定 (Plan)</th>
+                                        <th className="p-3 border-b font-medium">実施記録 (Actual)</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {history.map((item, idx) => (
+                                        <tr key={idx} className="hover:bg-gray-50 border-b">
+                                            <td className="p-3 text-sm text-gray-600">
+                                                {item.date} <br/>
+                                                <span className="text-xs bg-gray-200 px-1 rounded">{item.period}</span>
+                                            </td>
+                                            {selectedClass === 'ALL' && (
+                                                <td className="p-3 text-sm font-bold text-gray-600">{item.classId}</td>
+                                            )}
+                                            <td className="p-3 text-sm whitespace-pre-wrap">{item.plan}</td>
+                                            <td className="p-3 text-sm whitespace-pre-wrap text-blue-800">{item.actual}</td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        )}
+                    </div>
+                </div>
+            );
+        };
+
+        const StatsView = ({ data, classes }) => {
+            const counts = useMemo(() => {
+                const c = {};
+                classes.forEach(cls => c[cls.name] = 0);
+                
+                Object.values(data).forEach(dayData => {
+                    Object.entries(dayData).forEach(([slotId, slotData]) => {
+                        if (['1','2','3','4','5','6','7'].includes(slotId) && slotData.classId) {
+                            if (c[slotData.classId] === undefined) c[slotData.classId] = 0;
+                            c[slotData.classId]++;
+                        }
+                    });
+                });
+                return c;
+            }, [data, classes]);
+
+            const maxCount = Math.max(...Object.values(counts), 1);
+
+            return (
+                <div className="bg-white rounded shadow p-6 h-full overflow-hidden flex flex-col">
+                    <h2 className="text-xl font-bold text-gray-800 mb-6 border-b pb-2">授業数集計 (1限〜7限)</h2>
+                    
+                    <div className="flex-1 overflow-auto custom-scrollbar">
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                            {classes.map((cls, idx) => {
+                                const count = counts[cls.name] || 0;
+                                const percentage = (count / maxCount) * 100;
+                                const colorTheme = COLOR_PALETTE[cls.color || 'gray'];
+
+                                return (
+                                    <div key={idx} className="border rounded p-4 flex items-center justify-between shadow-sm bg-gray-50">
+                                        <div className="flex-1">
+                                            <div className="flex justify-between items-baseline mb-2">
+                                                <span className={`font-bold text-lg ${colorTheme.text}`}>{cls.name}</span>
+                                                <span className="text-2xl font-bold text-gray-900">{count} <span className="text-xs font-normal text-gray-500">コマ</span></span>
+                                            </div>
+                                            <div className="w-full bg-gray-200 rounded-full h-2.5">
+                                                <div className={`${colorTheme.bg} h-2.5 rounded-full`} style={{ width: `${percentage}%`, minWidth: '5%' }}></div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        const MonthView = ({ currentDate, data, onNavigateToWeek, classList }) => {
+            const year = currentDate.getFullYear();
+            const month = currentDate.getMonth();
+            const firstDay = new Date(year, month, 1);
+            const startingDay = firstDay.getDay(); 
+            const diff = startingDay === 0 ? 6 : startingDay - 1;
+            const daysInMonth = new Date(year, month + 1, 0).getDate();
+            
+            const grid = [];
+            let dayCounter = 1;
+            for (let i = 0; i < 6; i++) {
+                const row = [];
+                for (let j = 0; j < 7; j++) {
+                    if (i === 0 && j < diff) {
+                        row.push(null);
+                    } else if (dayCounter > daysInMonth) {
+                        row.push(null);
+                    } else {
+                        row.push(new Date(year, month, dayCounter));
+                        dayCounter++;
+                    }
+                }
+                grid.push(row);
+                if (dayCounter > daysInMonth) break;
+            }
+
+            const getClassColorStyle = (clsName) => {
+                const clsObj = classList.find(c => c.name === clsName);
+                const theme = COLOR_PALETTE[clsObj ? clsObj.color : (guessColor(clsName) || 'gray')];
+                return `${theme.bgLight} ${theme.text}`;
+            };
+
+            const periodMap = {
+                '1': '①', '2': '②', '3': '③', '4': '④', '5': '⑤', '6': '⑥', '7': '⑦'
+            };
+
+            return (
+                <div className="h-full flex flex-col p-4 overflow-hidden">
+                    <div className="bg-white rounded-lg shadow border flex-1 flex flex-col">
+                        <div className="grid grid-cols-7 border-b bg-gray-50">
+                            {WEEK_DAYS.concat(['日']).map((d, i) => (
+                                <div key={i} className={`p-2 text-center text-sm font-bold ${i === 6 ? 'text-red-500' : 'text-gray-600'}`}>
+                                    {d}
+                                </div>
+                            ))}
+                        </div>
+                        <div className="flex-1 grid grid-rows-5 sm:grid-rows-6">
+                            {grid.map((row, rIdx) => (
+                                <div key={rIdx} className="grid grid-cols-7 h-full">
+                                    {row.map((date, cIdx) => {
+                                        if (!date) return <div key={cIdx} className="bg-gray-50/50 border-r border-b"></div>;
+                                        
+                                        const dateKey = formatDateKey(date);
+                                        const dayData = data[dateKey] || {};
+                                        const isToday = formatDateKey(new Date()) === dateKey;
+
+                                        const dayClasses = [];
+                                        ['1','2','3','4','5','6','7'].forEach(pid => {
+                                            const slot = dayData[pid];
+                                            if (slot && slot.classId) {
+                                                dayClasses.push({ pid, classId: slot.classId });
+                                            }
+                                        });
+
+                                        return (
+                                            <div 
+                                                key={cIdx} 
+                                                onClick={() => onNavigateToWeek(date)}
+                                                className={`
+                                                    border-r border-b p-1 relative hover:bg-blue-50 cursor-pointer transition flex flex-col
+                                                    ${isToday ? 'bg-blue-50' : ''}
+                                                `}
+                                            >
+                                                <div className="flex justify-between items-start mb-1">
+                                                    <span className={`text-sm font-bold w-6 h-6 flex items-center justify-center rounded-full ${isToday ? 'bg-blue-600 text-white' : ''}`}>
+                                                        {date.getDate()}
+                                                    </span>
+                                                </div>
+                                                <div className="flex-1 overflow-hidden flex flex-wrap content-start gap-1">
+                                                    {dayClasses.map((item, idx) => (
+                                                        <span key={idx} className={`text-[10px] font-bold px-1 rounded flex items-center ${getClassColorStyle(item.classId)}`}>
+                                                            <span className="mr-0.5 opacity-70">{periodMap[item.pid]}</span>
+                                                            {item.classId}
+                                                        </span>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        const App = () => {
+            const [currentDate, setCurrentDate] = useState(new Date()); 
+            const [viewMode, setViewMode] = useState('week'); 
+            const [scheduleData, setScheduleData] = useState({}); 
+            const [classList, setClassList] = useState(DEFAULT_CLASSES);
+            const [teacherTitle, setTeacherTitle] = useState("1年A組 担任");
+            
+            // Sync State
+            const [syncId, setSyncId] = useState(() => {
+                const saved = localStorage.getItem('teacherLogSyncId');
+                return saved || generateId();
+            });
+            const [isSyncing, setIsSyncing] = useState(false);
+            const [isCloudLoaded, setIsCloudLoaded] = useState(false);
+
+            const [slotModalInfo, setSlotModalInfo] = useState({ isOpen: false, date: null, slotId: null });
+            const [isSettingsOpen, setSettingsOpen] = useState(false);
+
+            // --- Persistence & Sync Logic ---
+
+            useEffect(() => {
+                const savedData = localStorage.getItem('teachersLogData');
+                if (savedData) setScheduleData(JSON.parse(savedData));
+                
+                const savedClasses = localStorage.getItem('teachersLogClasses');
+                if (savedClasses) {
+                    const parsed = JSON.parse(savedClasses);
+                    if (parsed.length > 0 && typeof parsed[0] === 'string') {
+                        const migrated = parsed.map(c => ({ name: c, color: guessColor(c) }));
+                        setClassList(migrated);
+                    } else {
+                        setClassList(parsed);
+                    }
+                }
+
+                const savedTitle = localStorage.getItem('teacherLogTitle');
+                if (savedTitle) setTeacherTitle(savedTitle);
+            }, []);
+
+            // Function to manually trigger fetch/sync
+            const fetchFromCloud = useCallback(async (targetId = syncId) => {
+                if (!useCloud || !auth || !db) return;
+                
+                setIsSyncing(true);
+                try {
+                     // Check for pre-authenticated environment
+                     if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                        await auth.signInWithCustomToken(__initial_auth_token);
+                     } else {
+                        if (!auth.currentUser) await auth.signInAnonymously();
+                     }
+                     
+                     const docRef = db.collection('artifacts').doc(appId).collection('public').doc('data').collection('weekly_plans').doc(targetId);
+                     const doc = await docRef.get();
+                     
+                     if (doc.exists) {
+                         const remoteData = doc.data();
+                         console.log("Remote data found:", remoteData);
+                         
+                         if (remoteData.schedule) setScheduleData(remoteData.schedule);
+                         if (remoteData.classes) {
+                             const rClasses = remoteData.classes;
+                             if (rClasses.length > 0 && typeof rClasses[0] === 'string') {
+                                 setClassList(rClasses.map(c => ({ name: c, color: guessColor(c) })));
+                             } else {
+                                 setClassList(rClasses);
+                             }
+                         }
+                         if (remoteData.title) setTeacherTitle(remoteData.title);
+                         
+                         alert("クラウドからデータを受信しました！");
+                         setIsCloudLoaded(true); 
+                     } else {
+                         alert("クラウドにデータが見つかりませんでした。新規作成します。");
+                         setIsCloudLoaded(true); 
+                     }
+                } catch (err) {
+                    console.error("Sync error:", err);
+                    alert("通信エラーが発生しました。");
+                } finally {
+                    setIsSyncing(false);
+                }
+            }, [syncId, useCloud]);
+
+            // Save to Firestore on Change
+            const saveToCloud = useCallback(async (newSchedule, newClasses, newTitle) => {
+                if (!useCloud || !auth || !auth.currentUser) return;
+                // Guard clause
+                if (!isCloudLoaded && Object.keys(newSchedule).length === 0) {
+                     return;
+                }
+                
+                try {
+                    const docRef = db.collection('artifacts').doc(appId).collection('public').doc('data').collection('weekly_plans').doc(syncId);
+                    
+                    await docRef.set({
+                        schedule: newSchedule,
+                        classes: newClasses,
+                        title: newTitle,
+                        lastUpdated: new Date().toISOString()
+                    }, { merge: true });
+                } catch (e) {
+                    console.error("Cloud save failed:", e);
+                }
+            }, [syncId, useCloud, isCloudLoaded]);
+
+
+            useEffect(() => {
+                localStorage.setItem('teachersLogData', JSON.stringify(scheduleData));
+            }, [scheduleData]);
+            
+            useEffect(() => {
+                localStorage.setItem('teachersLogClasses', JSON.stringify(classList));
+            }, [classList]);
+            
+            useEffect(() => {
+                localStorage.setItem('teacherLogSyncId', syncId);
+            }, [syncId]);
+
+            useEffect(() => {
+                localStorage.setItem('teacherLogTitle', teacherTitle);
+            }, [teacherTitle]);
+
+            const currentMonday = getMonday(currentDate);
+            const displayMonth = currentMonday.getMonth() + 1;
+            const weekNumber = Math.ceil(currentMonday.getDate() / 7); 
+
+            const weekDates = WEEK_DAYS.map((_, i) => {
+                const d = new Date(currentMonday);
+                d.setDate(currentMonday.getDate() + i);
+                return d;
+            });
+
+            const navigateWeek = (direction) => {
+                const newDate = new Date(currentMonday);
+                newDate.setDate(currentMonday.getDate() + (direction * 7));
+                setCurrentDate(newDate);
+            };
+            
+            const navigateMonth = (direction) => {
+                const newDate = new Date(currentDate);
+                newDate.setMonth(currentDate.getMonth() + direction);
+                setCurrentDate(newDate);
+            };
+
+            const navigateToToday = () => {
+                const now = new Date();
+                setCurrentDate(now);
+                if (viewMode === 'month') {
+                    // Stay in month
+                } else {
+                    setViewMode('week');
+                }
+            };
+
+            const handleSlotClick = (date, slotId) => {
+                setSlotModalInfo({
+                    isOpen: true,
+                    date: formatDateKey(date),
+                    slotId: slotId
+                });
+            };
+
+            const handleSaveSlot = (dateKey, slotId, newData) => {
+                setIsCloudLoaded(true); 
+
+                const updatedSchedule = {
+                    ...scheduleData,
+                    [dateKey]: {
+                        ...(scheduleData[dateKey] || {}),
+                        [slotId]: newData
+                    }
+                };
+                setScheduleData(updatedSchedule);
+                saveToCloud(updatedSchedule, classList, teacherTitle);
+            };
+
+            const handleUpdateClasses = (newClasses) => {
+                setIsCloudLoaded(true);
+                setClassList(newClasses);
+                saveToCloud(scheduleData, newClasses, teacherTitle);
+            };
+            
+            const handleUpdateTeacherTitle = (newTitle) => {
+                setIsCloudLoaded(true);
+                setTeacherTitle(newTitle);
+                saveToCloud(scheduleData, classList, newTitle);
+            };
+
+            const handleNavigateFromMonth = (date) => {
+                setCurrentDate(date);
+                setViewMode('week');
+            };
+
+            const handlePrint = () => {
+                window.print();
+            };
+
+            const exportData = () => {
+                const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify({
+                    schedule: scheduleData, 
+                    classes: classList,
+                    title: teacherTitle
+                }));
+                const downloadAnchorNode = document.createElement('a');
+                downloadAnchorNode.setAttribute("href", dataStr);
+                downloadAnchorNode.setAttribute("download", `weekly_plan_backup_${formatDateKey(new Date())}.json`);
+                document.body.appendChild(downloadAnchorNode);
+                downloadAnchorNode.click();
+                downloadAnchorNode.remove();
+            };
+
+            const importData = (event) => {
+                const fileReader = new FileReader();
+                fileReader.readAsText(event.target.files[0], "UTF-8");
+                fileReader.onload = e => {
+                    const parsed = JSON.parse(e.target.result);
+                    if(parsed.schedule) setScheduleData(parsed.schedule);
+                    if(parsed.classes) {
+                         const rClasses = parsed.classes;
+                         if (rClasses.length > 0 && typeof rClasses[0] === 'string') {
+                             setClassList(rClasses.map(c => ({ name: c, color: guessColor(c) })));
+                         } else {
+                             setClassList(rClasses);
+                         }
+                    }
+                    if(parsed.title) setTeacherTitle(parsed.title);
+                    
+                    setIsCloudLoaded(true);
+                    saveToCloud(parsed.schedule, parsed.classes, parsed.title || teacherTitle);
+                    alert("データを復元しました。");
+                };
+            };
+
+            const SlotCell = ({ dateKey, slot, date }) => {
+                const dayData = scheduleData[dateKey] || {};
+                const slotData = dayData[slot.id] || {};
+                const text = slotData.plan || slotData.actual || '';
+                const isActual = !slotData.plan && slotData.actual; 
+                
+                const getBadgeStyle = (clsName) => {
+                    const clsObj = classList.find(c => c.name === clsName);
+                    if (!clsObj) {
+                         const guessed = guessColor(clsName);
+                         const theme = COLOR_PALETTE[guessed];
+                         return `${theme.bgLight} ${theme.text}`;
+                    }
+                    const theme = COLOR_PALETTE[clsObj.color || 'gray'];
+                    return `${theme.bgLight} ${theme.text}`;
+                };
+
+                return (
+                    <div 
+                        className={`
+                            border-b border-r border-gray-200 p-1 text-xs relative cursor-pointer hover:bg-blue-50 transition-colors
+                            ${slot.height} overflow-hidden group
+                            ${slot.id === 'lunch' ? 'bg-gray-100 text-center flex items-center justify-center text-gray-400 print:text-black print:bg-gray-100' : 'bg-white'}
+                            print-row
+                        `}
+                        onClick={() => handleSlotClick(date, slot.id)}
+                    >
+                        {slot.type === 'class' && slotData.classId && (
+                            <span className={`block font-bold mb-1 text-[10px] inline-block px-1.5 py-0.5 rounded ${getBadgeStyle(slotData.classId)} print:border print:border-black print:bg-white print:text-black`}>
+                                {slotData.classId}
+                            </span>
+                        )}
+                        
+                        <div className="whitespace-pre-wrap leading-tight text-gray-700 print:text-black">
+                            {isActual && <span className="text-orange-500 font-bold text-[10px] no-print">[実] </span>}
+                            {text}
+                        </div>
+                    </div>
+                );
+            };
+
+            return (
+                <div className="h-screen flex flex-col bg-gray-50 text-gray-800 print:bg-white print:h-auto">
+                    <header className="bg-white border-b shadow-sm px-4 py-3 flex items-center justify-between z-10 shrink-0 no-print">
+                        <div className="flex items-center gap-4">
+                            <div className="bg-blue-600 text-white p-2 rounded-lg shadow">
+                                <Icons.Calendar />
+                            </div>
+                            <div>
+                                <h1 className="text-xl font-bold leading-none hidden md:block flex items-center gap-2">
+                                    Teacher's Log Pro
+                                    <span className="text-xs font-normal text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded border">{APP_VERSION}</span>
+                                </h1>
+                                <p className="text-xs text-gray-500 font-medium mt-1 flex items-center gap-1">
+                                    {teacherTitle} 
+                                    {useCloud && (
+                                        <span className={`flex items-center gap-1 ml-2 ${isCloudLoaded ? 'text-green-500' : 'text-gray-400'}`}>
+                                            <Icons.Cloud size={10} /> {isCloudLoaded ? '同期OK' : '未接続'}
+                                        </span>
+                                    )}
+                                </p>
+                            </div>
+                        </div>
+
+                        <div className="flex bg-gray-100 p-1 rounded-lg">
+                            <button 
+                                onClick={() => setViewMode('month')}
+                                className={`px-4 py-1.5 rounded-md text-sm font-medium transition ${viewMode === 'month' ? 'bg-white shadow text-blue-600' : 'text-gray-500 hover:text-gray-700'}`}
+                            >
+                                月
+                            </button>
+                            <button 
+                                onClick={() => setViewMode('week')}
+                                className={`px-4 py-1.5 rounded-md text-sm font-medium transition ${viewMode === 'week' ? 'bg-white shadow text-blue-600' : 'text-gray-500 hover:text-gray-700'}`}
+                            >
+                                週
+                            </button>
+                            <button 
+                                onClick={() => setViewMode('history')}
+                                className={`px-4 py-1.5 rounded-md text-sm font-medium transition ${viewMode === 'history' ? 'bg-white shadow text-blue-600' : 'text-gray-500 hover:text-gray-700'}`}
+                            >
+                                履歴
+                            </button>
+                            <button 
+                                onClick={() => setViewMode('stats')}
+                                className={`px-4 py-1.5 rounded-md text-sm font-medium flex items-center gap-1 transition ${viewMode === 'stats' ? 'bg-white shadow text-blue-600' : 'text-gray-500 hover:text-gray-700'}`}
+                            >
+                                <Icons.BarChart /> 集計
+                            </button>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                             <button onClick={handlePrint} className="p-2 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded" title="印刷">
+                                <Icons.Printer />
+                            </button>
+                             <label className="p-2 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded cursor-pointer">
+                                <Icons.Upload />
+                                <input type="file" onChange={importData} className="hidden" accept=".json"/>
+                            </label>
+                            <button onClick={exportData} className="p-2 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded">
+                                <Icons.Download />
+                            </button>
+                            <button onClick={() => setSettingsOpen(true)} className="p-2 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded relative">
+                                <Icons.Settings />
+                                {!isCloudLoaded && useCloud && (
+                                    <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
+                                )}
+                            </button>
+                        </div>
+                    </header>
+
+                    <main className="flex-1 overflow-hidden relative flex flex-col print:overflow-visible">
+                        <div className="flex items-center justify-between px-6 py-3 bg-white border-b shrink-0 no-print">
+                            <div className="flex items-center gap-4">
+                                <button onClick={() => viewMode === 'month' ? navigateMonth(-1) : navigateWeek(-1)} className="p-1 hover:bg-gray-100 rounded-full"><Icons.ChevronLeft/></button>
+                                <h2 className="text-2xl font-bold font-mono text-gray-800 flex items-baseline gap-2">
+                                    {currentDate.getFullYear()}年 {currentDate.getMonth() + 1}月 
+                                    {viewMode === 'week' && <span className="text-lg text-gray-400 font-normal">第{weekNumber}週</span>}
+                                </h2>
+                                <button onClick={() => viewMode === 'month' ? navigateMonth(1) : navigateWeek(1)} className="p-1 hover:bg-gray-100 rounded-full"><Icons.ChevronRight/></button>
+                                <button onClick={navigateToToday} className="text-xs bg-gray-200 px-2 py-1 rounded hover:bg-gray-300">今日</button>
+                            </div>
+                        </div>
+
+                        {/* Print Header */}
+                        <div className="print-only p-4 border-b text-center">
+                            <h1 className="text-2xl font-bold">{currentDate.getFullYear()}年 {currentDate.getMonth() + 1}月 第{weekNumber}週 週案</h1>
+                            <p className="text-sm text-gray-600 text-right">{teacherTitle}</p>
+                        </div>
+
+                        <div className="flex-1 overflow-hidden print:overflow-visible">
+                            {viewMode === 'week' && (
+                                <div className="h-full overflow-auto custom-scrollbar p-4 print:p-0 print:overflow-visible">
+                                    <div className="bg-white shadow rounded-lg overflow-hidden border border-gray-200 min-w-[800px] print:shadow-none print:min-w-0 print:border-black">
+                                        <div className="grid grid-cols-[80px_repeat(6,1fr)] bg-gray-50 border-b border-gray-200 print:bg-white print:border-black">
+                                            <div className="p-3 text-center text-xs font-bold text-gray-500 uppercase tracking-wider border-r print:text-black print:border-black">時限</div>
+                                            {weekDates.map((date, i) => (
+                                                <div key={i} className={`p-2 text-center border-r last:border-r-0 print:border-black ${
+                                                    date.toDateString() === new Date().toDateString() ? 'bg-blue-50 print:bg-white' : ''
+                                                }`}>
+                                                    <div className="text-xs text-gray-500 print:text-black">{WEEK_DAYS[i]}</div>
+                                                    <div className={`text-lg font-bold print:text-black ${
+                                                        i === 5 ? 'text-blue-600' : 'text-gray-800'
+                                                    }`}>
+                                                        {date.getDate()}
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+
+                                        {TIME_SLOTS.map(slot => (
+                                            <div key={slot.id} className="grid grid-cols-[80px_repeat(6,1fr)] hover:bg-gray-50 transition-colors print:hover:bg-transparent print-row">
+                                                <div className={`
+                                                    border-b border-r border-gray-200 flex items-center justify-center text-xs font-bold text-gray-600 bg-gray-50 print:bg-white print:text-black print:border-black
+                                                    ${slot.id === 'lunch' ? 'bg-gray-100' : ''}
+                                                `}>
+                                                    {slot.label}
+                                                </div>
+                                                {weekDates.map((date, i) => (
+                                                    <div key={i} className="print:border-b print:border-r print:border-black">
+                                                        <SlotCell 
+                                                            key={i} 
+                                                            dateKey={formatDateKey(date)} 
+                                                            slot={slot}
+                                                            date={date}
+                                                        />
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+
+                            {viewMode === 'month' && (
+                                <MonthView 
+                                    currentDate={currentDate} 
+                                    data={scheduleData}
+                                    classList={classList}
+                                    onNavigateToWeek={handleNavigateFromMonth}
+                                />
+                            )}
+
+                            {viewMode === 'history' && (
+                                <div className="h-full p-4">
+                                    <ClassHistoryView data={scheduleData} classes={classList} />
+                                </div>
+                            )}
+
+                            {viewMode === 'stats' && (
+                                <div className="h-full p-4">
+                                    <StatsView data={scheduleData} classes={classList} />
+                                </div>
+                            )}
+                        </div>
+                    </main>
+
+                    <SlotModal 
+                        isOpen={slotModalInfo.isOpen}
+                        onClose={() => setSlotModalInfo({ ...slotModalInfo, isOpen: false })}
+                        date={slotModalInfo.date}
+                        slotId={slotModalInfo.slotId}
+                        data={scheduleData[slotModalInfo.date]?.[slotModalInfo.slotId]}
+                        onSave={handleSaveSlot}
+                        classOptions={classList}
+                    />
+
+                    <SettingsModal 
+                        isOpen={isSettingsOpen}
+                        onClose={() => setSettingsOpen(false)}
+                        classes={classList}
+                        onUpdateClasses={handleUpdateClasses}
+                        syncId={syncId}
+                        onUpdateSyncId={setSyncId}
+                        onTriggerSync={fetchFromCloud}
+                        isSyncing={isSyncing}
+                        teacherTitle={teacherTitle}
+                        onUpdateTeacherTitle={handleUpdateTeacherTitle}
+                    />
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
 </body>
 </html>
