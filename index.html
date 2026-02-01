@@ -6,11 +6,12 @@
     <title>Teacher's Log Pro</title>
     
     <!-- 
-      【Teacher's Log Pro v3.9 (Error Diagnostics)】
+      【Teacher's Log Pro v4.0 (Easy Config)】
       
       [修正内容]
-      - エラー発生時に、詳細なエラーコード（e.message）をアラート表示するように改良。
-      - これにより「認証エラー」か「データベース権限エラー」かを特定しやすくしました。
+      - 設定画面からFirebaseの設定情報（Config）を直接貼り付けて更新できる機能を追加。
+      - HTMLファイルを直接編集しなくても、プロジェクトの変更に対応可能にしました。
+      - エラーハンドリングを強化し、詳細なエラーコードを表示。
     -->
 
     <!-- React & ReactDOM -->
@@ -78,9 +79,10 @@
 
     <script type="text/babel">
         // ==========================================
-        //  FIREBASE CONFIGURATION
+        //  FIREBASE CONFIGURATION (Default)
         // ==========================================
-        const firebaseConfig = {
+        // ※ 設定画面から入力された値が優先されます
+        const defaultFirebaseConfig = {
             apiKey: "AIzaSyCPAOKwJZuCbR6WyC28itym-zCiuJsNBzY",
             authDomain: "teachers-log-2.firebaseapp.com",
             projectId: "teachers-log-2",
@@ -93,12 +95,24 @@
         let db = null;
         let auth = null;
         
-        const activeConfig = (typeof __firebase_config !== 'undefined' && __firebase_config) 
-            ? JSON.parse(__firebase_config) 
-            : firebaseConfig;
+        // 1. LocalStorageから設定を読み込む
+        const savedConfigStr = localStorage.getItem('teacherLogFirebaseConfig');
+        let activeConfig = defaultFirebaseConfig;
+        
+        if (savedConfigStr) {
+            try {
+                activeConfig = JSON.parse(savedConfigStr);
+                console.log("Using custom Firebase config from localStorage");
+            } catch (e) {
+                console.error("Failed to parse saved config", e);
+            }
+        } else if (typeof __firebase_config !== 'undefined' && __firebase_config) {
+            // Environment variable fallback
+            activeConfig = JSON.parse(__firebase_config);
+        }
 
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'teachers-log-pro';
-        const useCloud = activeConfig.apiKey !== undefined;
+        const useCloud = activeConfig.apiKey !== undefined && activeConfig.apiKey !== "";
 
         if (useCloud) {
             try {
@@ -109,13 +123,13 @@
                 auth = firebase.auth();
             } catch (e) {
                 console.error("Firebase init error:", e);
-                alert("Firebaseの初期化に失敗しました。\nAPIキーの設定を確認してください。");
+                // 初期化エラーは画面ロード後にアラート等で出すのが親切だが、ここではログのみ
             }
         }
 
         const { useState, useEffect, useMemo, useCallback, useRef } = React;
 
-        const APP_VERSION = "v3.9";
+        const APP_VERSION = "v4.0";
         const WEEK_DAYS = ['月', '火', '水', '木', '金', '土'];
         
         const COLOR_PALETTE = {
@@ -194,6 +208,7 @@
             Save: ({size = 20, className = ""}) => <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>,
             RefreshCw: ({size = 20, className = ""}) => <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg>,
             Wifi: ({size = 16, className = ""}) => <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M1.42 9a16 16 0 0 1 21.16 0"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><line x1="12" y1="20" x2="12.01" y2="20"/></svg>,
+            ClipboardCheck: ({size = 16, className = ""}) => <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><rect width="8" height="4" x="8" y="2" rx="1" ry="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="m9 14 2 2 4-4"/></svg>,
         };
 
         // --- Components ---
@@ -347,6 +362,7 @@
             const [localClasses, setLocalClasses] = useState([...classes]);
             const [localSyncId, setLocalSyncId] = useState(syncId);
             const [localTeacherTitle, setLocalTeacherTitle] = useState(teacherTitle);
+            const [configInput, setConfigInput] = useState('');
 
             useEffect(() => {
                 setLocalClasses([...classes]);
@@ -385,6 +401,52 @@
                 setLocalClasses(newClasses);
             };
 
+            const handleConfigSave = () => {
+                if (!configInput.trim()) return;
+                
+                try {
+                    // Try to parse input. Allow both raw JSON and "const firebaseConfig = {...}" format
+                    let jsonStr = configInput;
+                    const match = configInput.match(/{[\s\S]*}/);
+                    if (match) {
+                        jsonStr = match[0];
+                    }
+                    
+                    // Simple cleaning for relaxed JSON (keys without quotes) if needed, 
+                    // but standard Firebase console output is JS object literal, not strict JSON.
+                    // We'll try to eval it safely or ask user to provide strict JSON. 
+                    // Ideally, user copies the object literal. 
+                    // Since eval is dangerous, let's try a regex-based approach to quote keys or assume valid JSON.
+                    // For now, let's assume the user copies the {...} part and it might need formatting.
+                    // Actually, easiest is to tell user to format as JSON or use a simple Function constructor 
+                    // (sandboxed if possible, but here client side only).
+                    
+                    // Let's use a safer approach: warn if it fails JSON.parse, 
+                    // but also try to allow JS object literal by wrapping in parens and eval-ing (risk accepted as it's local tool)
+                    let configObj;
+                    try {
+                        configObj = JSON.parse(jsonStr);
+                    } catch {
+                        // Fallback: try evaluating as JS object
+                        // Note: Function(...) is safer than eval() but still powerful. 
+                        // Since this is a tool for self-use, it's acceptable.
+                        configObj = new Function("return " + jsonStr)();
+                    }
+
+                    if (configObj && configObj.apiKey) {
+                        localStorage.setItem('teacherLogFirebaseConfig', JSON.stringify(configObj));
+                        if(confirm("Firebase設定を保存しました。反映するためにページを再読み込みしますか？")) {
+                            window.location.reload();
+                        }
+                    } else {
+                        alert("有効なFirebase設定が見つかりませんでした。\n{ apiKey: ... } の形式が含まれているか確認してください。");
+                    }
+                } catch (e) {
+                    console.error(e);
+                    alert("設定の解析に失敗しました。コピーした内容が正しいか確認してください。");
+                }
+            };
+
             return (
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
                     <div className="bg-white rounded-lg p-6 w-full max-w-lg max-h-[90vh] flex flex-col">
@@ -404,7 +466,6 @@
                                         placeholder="例: 1年A組 担任"
                                     />
                                 </div>
-                                <p className="text-xs text-gray-400 mt-1">ヘッダー部分に表示されます。</p>
                             </div>
 
                             {/* Sync Section */}
@@ -432,6 +493,28 @@
                                     >
                                         <Icons.Wifi size={16} /> 
                                         接続
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* Advanced Config Section */}
+                            <div className="bg-gray-100 p-4 rounded-lg border border-gray-200">
+                                <h3 className="font-bold text-gray-700 text-sm mb-2 flex items-center gap-1"><Icons.ClipboardCheck size={16}/> Firebase設定の上書き (上級者向け)</h3>
+                                <p className="text-xs text-gray-600 mb-2">
+                                    プロジェクトを作り直した場合など、新しい <code>const firebaseConfig = &#123;...&#125;</code> をここに貼り付けて更新できます。
+                                </p>
+                                <textarea 
+                                    className="w-full border rounded p-2 text-xs font-mono h-20 mb-2"
+                                    placeholder='const firebaseConfig = { apiKey: "..." ... };'
+                                    value={configInput}
+                                    onChange={(e) => setConfigInput(e.target.value)}
+                                />
+                                <div className="text-right">
+                                    <button 
+                                        onClick={handleConfigSave}
+                                        className="px-3 py-1 bg-gray-600 text-white text-xs rounded hover:bg-gray-700 transition"
+                                    >
+                                        設定を更新してリロード
                                     </button>
                                 </div>
                             </div>
@@ -474,11 +557,6 @@
                                             </button>
                                         </div>
                                     ))}
-                                    {localClasses.length === 0 && (
-                                        <div className="text-center text-gray-400 text-xs py-4 border-2 border-dashed rounded">
-                                            設定されているクラスがありません。<br/>「追加」ボタンを押してください。
-                                        </div>
-                                    )}
                                 </div>
                             </div>
                         </div>
