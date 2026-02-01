@@ -6,12 +6,12 @@
     <title>Teacher's Log Pro</title>
     
     <!-- 
-      【Teacher's Log Pro v3.2 (Layout Compacted)】
+      【Teacher's Log Pro v3.4】
       
       [更新内容]
-      - 画面の縦幅を最適化（約25%短縮）し、一覧性を向上させました。
-      - 授業コマ: h-32(128px) -> h-24(96px)
-      - その他スロットもバランスよく調整
+      - デフォルト色の変更（2年:緑, 3年:青）
+      - クラス選択の初期状態を「未選択」に変更
+      - ヘッダーボタンの間隔調整
     -->
 
     <!-- React & ReactDOM -->
@@ -115,7 +115,7 @@
 
         const { useState, useEffect, useMemo, useCallback, useRef } = React;
 
-        const APP_VERSION = "v3.2";
+        const APP_VERSION = "v3.4";
         const WEEK_DAYS = ['月', '火', '水', '木', '金', '土'];
         
         const COLOR_PALETTE = {
@@ -131,25 +131,24 @@
 
         const DEFAULT_CLASSES = [
             { name: '1A', color: 'red' }, { name: '1B', color: 'red' },
-            { name: '2A', color: 'blue' }, { name: '2B', color: 'blue' },
-            { name: '3A', color: 'green' }, { name: '3B', color: 'green' },
+            { name: '2A', color: 'green' }, { name: '2B', color: 'green' }, // 2年: 緑
+            { name: '3A', color: 'blue' }, { name: '3B', color: 'blue' },   // 3年: 青
             { name: '道徳', color: 'yellow' }, { name: '総学', color: 'orange' },
             { name: 'HR', color: 'indigo' }, { name: '監督', color: 'gray' }, { name: 'その他', color: 'gray' }
         ];
 
-        // Adjusted heights for better fit without being too squashed
         const TIME_SLOTS = [
-            { id: 'morning', label: '朝・行事', type: 'special', height: 'h-20' }, // 80px
-            { id: '1', label: '1限', type: 'class', height: 'h-24' }, // 96px (Reduced from h-32/128px)
+            { id: 'morning', label: '朝・行事', type: 'special', height: 'h-20' },
+            { id: '1', label: '1限', type: 'class', height: 'h-24' },
             { id: '2', label: '2限', type: 'class', height: 'h-24' },
             { id: '3', label: '3限', type: 'class', height: 'h-24' },
             { id: '4', label: '4限', type: 'class', height: 'h-24' },
-            { id: 'lunch', label: '昼休み', type: 'break', height: 'h-8' }, // 32px (Compact)
+            { id: 'lunch', label: '昼休み', type: 'break', height: 'h-8' },
             { id: '5', label: '5限', type: 'class', height: 'h-24' },
             { id: '6', label: '6限', type: 'class', height: 'h-24' },
             { id: '7', label: '7限', type: 'class', height: 'h-24' },
-            { id: 'after', label: '帰りHR', type: 'special', height: 'h-14' }, // 56px
-            { id: 'memo', label: 'メモ', type: 'memo', height: 'h-20' }, // 80px
+            { id: 'after', label: '帰りHR', type: 'special', height: 'h-14' },
+            { id: 'memo', label: 'メモ', type: 'memo', height: 'h-20' },
         ];
 
         const formatDateKey = (date) => {
@@ -168,8 +167,8 @@
 
         const guessColor = (name) => {
             if (name.startsWith('1')) return 'red';
-            if (name.startsWith('2')) return 'blue';
-            if (name.startsWith('3')) return 'green';
+            if (name.startsWith('2')) return 'green'; // 2年: 緑
+            if (name.startsWith('3')) return 'blue';  // 3年: 青
             if (name.includes('道徳')) return 'yellow';
             if (name.includes('HR')) return 'indigo';
             return 'gray';
@@ -177,21 +176,23 @@
 
         // Icons
         const Icons = {
-            ChevronLeft: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6"/></svg>,
-            ChevronRight: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m9 18 6-6-6-6"/></svg>,
-            Calendar: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="18" height="18" x="3" y="4" rx="2" ry="2"/><line x1="16" x2="16" y1="2" y2="6"/><line x1="8" x2="8" y1="2" y2="6"/><line x1="3" x2="21" y1="10" y2="10"/></svg>,
-            List: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="8" x2="21" y1="6" y2="6"/><line x1="8" x2="21" y1="12" y2="12"/><line x1="8" x2="21" y1="18" y2="18"/><line x1="3" x2="3.01" y1="6" y2="6"/><line x1="3" x2="3.01" y1="12" y2="12"/><line x1="3" x2="3.01" y1="18" y2="18"/></svg>,
-            Settings: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.09a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>,
-            Download: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>,
-            Upload: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" x2="12" y1="3" y2="15"/></svg>,
-            X: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>,
-            BarChart: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" x2="12" y1="20" y2="10"/><line x1="18" x2="18" y1="20" y2="4"/><line x1="6" x2="6" y1="20" y2="16"/></svg>,
-            Cloud: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17.5 19c0-3.037-2.463-5.5-5.5-5.5S6.5 15.963 6.5 19"/><path d="M20 16.952c1.235-.976 2-2.528 2-4.162 0-2.761-2.238-5-5-5-.403 0-.792.051-1.168.146C15.394 5.378 13.068 4 10.5 4 6.91 4 4 6.91 4 10.5c0 1.637.595 3.125 1.583 4.29"/></svg>,
-            Plus: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" x2="12" y1="5" y2="19"/><line x1="5" x2="19" y1="12" y2="12"/></svg>,
-            Trash: () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>,
-            DownloadCloud: () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 14.899A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242"/><path d="M12 12v9"/><path d="m8 17 4 4 4-4"/></svg>,
-            Printer: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect width="12" height="8" x="6" y="14"/></svg>,
-            Search: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" x2="16.65" y1="21" y2="16.65"/></svg>,
+            ChevronLeft: ({size = 24, className = ""}) => <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="m15 18-6-6 6-6"/></svg>,
+            ChevronRight: ({size = 24, className = ""}) => <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="m9 18 6-6-6-6"/></svg>,
+            Calendar: ({size = 20, className = ""}) => <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><rect width="18" height="18" x="3" y="4" rx="2" ry="2"/><line x1="16" x2="16" y1="2" y2="6"/><line x1="8" x2="8" y1="2" y2="6"/><line x1="3" x2="21" y1="10" y2="10"/></svg>,
+            List: ({size = 20, className = ""}) => <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><line x1="8" x2="21" y1="6" y2="6"/><line x1="8" x2="21" y1="12" y2="12"/><line x1="8" x2="21" y1="18" y2="18"/><line x1="3" x2="3.01" y1="6" y2="6"/><line x1="3" x2="3.01" y1="12" y2="12"/><line x1="3" x2="3.01" y1="18" y2="18"/></svg>,
+            Settings: ({size = 20, className = ""}) => <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.09a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>,
+            Download: ({size = 20, className = ""}) => <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>,
+            Upload: ({size = 20, className = ""}) => <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" x2="12" y1="3" y2="15"/></svg>,
+            X: ({size = 24, className = ""}) => <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>,
+            BarChart: ({size = 20, className = ""}) => <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><line x1="12" x2="12" y1="20" y2="10"/><line x1="18" x2="18" y1="20" y2="4"/><line x1="6" x2="6" y1="20" y2="16"/></svg>,
+            Cloud: ({size = 20, className = ""}) => <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M17.5 19c0-3.037-2.463-5.5-5.5-5.5S6.5 15.963 6.5 19"/><path d="M20 16.952c1.235-.976 2-2.528 2-4.162 0-2.761-2.238-5-5-5-.403 0-.792.051-1.168.146C15.394 5.378 13.068 4 10.5 4 6.91 4 4 6.91 4 10.5c0 1.637.595 3.125 1.583 4.29"/></svg>,
+            Plus: ({size = 20, className = ""}) => <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><line x1="12" x2="12" y1="5" y2="19"/><line x1="5" x2="19" y1="12" y2="12"/></svg>,
+            Trash: ({size = 16, className = ""}) => <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>,
+            DownloadCloud: ({size = 16, className = ""}) => <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M4 14.899A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242"/><path d="M12 12v9"/><path d="m8 17 4 4 4-4"/></svg>,
+            Printer: ({size = 20, className = ""}) => <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect width="12" height="8" x="6" y="14"/></svg>,
+            Search: ({size = 20, className = ""}) => <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><circle cx="11" cy="11" r="8"/><line x1="21" x2="16.65" y1="21" y2="16.65"/></svg>,
+            Save: ({size = 20, className = ""}) => <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>,
+            RefreshCw: ({size = 20, className = ""}) => <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg>,
         };
 
         // --- Components ---
@@ -232,13 +233,14 @@
 
             const slotDef = TIME_SLOTS.find(s => s.id === slotId);
             const isClassSlot = slotDef?.type === 'class';
-            const defaultClassId = classOptions.length > 0 ? classOptions[0].name : '';
-            const initialData = data || { plan: '', actual: '', classId: isClassSlot ? defaultClassId : '', memo: '' };
+            // Default to empty string (no class selected)
+            const defaultClassId = '';
+            const initialData = data || { plan: '', actual: '', classId: defaultClassId, memo: '' };
 
             const [localData, setLocalData] = useState(initialData);
 
             useEffect(() => {
-                let loadedData = data || { plan: '', actual: '', classId: isClassSlot ? defaultClassId : '', memo: '' };
+                let loadedData = data || { plan: '', actual: '', classId: defaultClassId, memo: '' };
                 if (!isClassSlot && loadedData.actual && !loadedData.plan.includes(loadedData.actual)) {
                     loadedData = { 
                         ...loadedData, 
@@ -847,9 +849,9 @@
             const saveToCloud = useCallback(async (newSchedule, newClasses, newTitle) => {
                 if (!useCloud || !auth || !auth.currentUser) return;
                 // Guard clause
-                if (!isCloudLoaded && Object.keys(newSchedule).length === 0) {
-                     return;
-                }
+                // if (!isCloudLoaded && Object.keys(newSchedule).length === 0) {
+                //      return;
+                // }
                 
                 try {
                     const docRef = db.collection('artifacts').doc(appId).collection('public').doc('data').collection('weekly_plans').doc(syncId);
@@ -955,6 +957,19 @@
 
             const handlePrint = () => {
                 window.print();
+            };
+
+            const handleManualSave = async () => {
+                if (!window.confirm("現在のデータをクラウドに上書き保存しますか？")) return;
+                setIsSyncing(true);
+                await saveToCloud(scheduleData, classList, teacherTitle);
+                setIsSyncing(false);
+                alert("クラウドに保存しました。");
+            };
+
+            const handleManualLoad = async () => {
+                if (!window.confirm("クラウドから最新データを読み込みますか？\n（現在の未保存の変更は失われます）")) return;
+                await fetchFromCloud();
             };
 
             const exportData = () => {
@@ -1084,7 +1099,18 @@
                             </button>
                         </div>
 
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 ml-4"> {/* Added ml-4 here */}
+                             {useCloud && (
+                                 <>
+                                     <button onClick={handleManualLoad} className="flex items-center gap-1 bg-gray-100 text-gray-700 px-3 py-1.5 rounded-lg border border-gray-300 hover:bg-gray-200 text-xs font-bold transition mr-1" title="クラウドから最新データを読み込む">
+                                         <Icons.RefreshCw size={14} /> 読込
+                                     </button>
+                                     <button onClick={handleManualSave} className="flex items-center gap-1 bg-blue-600 text-white px-3 py-1.5 rounded-lg hover:bg-blue-700 text-xs font-bold shadow-sm transition mr-2" title="クラウドへ保存する">
+                                         <Icons.Save size={14} /> 保存
+                                     </button>
+                                 </>
+                             )}
+                             
                              <button onClick={handlePrint} className="p-2 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded" title="印刷">
                                 <Icons.Printer />
                             </button>
