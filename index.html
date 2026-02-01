@@ -90,18 +90,14 @@
         // ==========================================
         //  FIREBASE CONFIGURATION
         // ==========================================
-        // クラウド同期機能を使う場合は、Firebaseコンソールでプロジェクトを作成し、
-        // ウェブアプリの設定から取得した `firebaseConfig` オブジェクトを
-        // 以下の変数に貼り付けてください。
-        // ※ 設定がない場合は、ブラウザ内の保存のみ（ローカルモード）で動作します。
         
         const firebaseConfig = {
-            // apiKey: "AIzaSyD...",
-            // authDomain: "your-project.firebaseapp.com",
-            // projectId: "your-project",
-            // storageBucket: "your-project.appspot.com",
-            // messagingSenderId: "...",
-            // appId: "..."
+            apiKey: "AIzaSyClXiF1YnVVAgUo-iaa-sCn1CF5tPTWeR0",
+            authDomain: "teachers-log-2-new.firebaseapp.com",
+            projectId: "teachers-log-2-new",
+            storageBucket: "teachers-log-2-new.firebasestorage.app",
+            messagingSenderId: "296015295174",
+            appId: "1:296015295174:web:3b46bb013d784e249a1dc7"
         };
 
         // ==========================================
@@ -114,8 +110,9 @@
             ? JSON.parse(__firebase_config) 
             : firebaseConfig;
 
+        // 設定が正しく入っているか簡易チェック
+        const useCloud = activeConfig.apiKey && activeConfig.apiKey !== "ここにAPIキーを貼り付け";
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'teachers-log-pro';
-        const useCloud = activeConfig.apiKey !== undefined;
 
         if (useCloud) {
             try {
@@ -126,7 +123,7 @@
                 auth = firebase.auth();
             } catch (e) {
                 console.error("Firebase init error:", e);
-                alert("Firebaseの設定に誤りがある可能性があります。コンソールを確認してください。");
+                alert("Firebaseの設定エラー: コンソールを確認してください。");
             }
         }
 
@@ -790,7 +787,6 @@
                 
                 setIsSyncing(true);
                 try {
-                     // Check for pre-authenticated environment
                      if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
                         await auth.signInWithCustomToken(__initial_auth_token);
                      } else {
@@ -832,7 +828,6 @@
             // Save to Firestore on Change
             const saveToCloud = useCallback(async (newSchedule, newClasses, newTitle) => {
                 if (!useCloud || !auth || !auth.currentUser) return;
-                // Guard clause
                 if (!isCloudLoaded && Object.keys(newSchedule).length === 0) {
                      return;
                 }
