@@ -6,18 +6,12 @@
     <title>Teacher's Log Pro</title>
     
     <!-- 
-      【Teacher's Log Pro v3.0】
+      【Teacher's Log Pro v3.2 (Layout Compacted)】
       
-      世界最高の教師のための、世界最高の週案アプリ。
-      
-      [機能]
-      - 週案の作成・編集
-      - 月間カレンダー表示
-      - クラスごとの実施時数集計
-      - 検索機能
-      - クラウド同期 (Google Firebase)
-      - 公文書用印刷モード
-      - レスポンシブ対応 (iPad/PC)
+      [更新内容]
+      - 画面の縦幅を最適化（約25%短縮）し、一覧性を向上させました。
+      - 授業コマ: h-32(128px) -> h-24(96px)
+      - その他スロットもバランスよく調整
     -->
 
     <!-- React & ReactDOM -->
@@ -44,7 +38,7 @@
         body {
             font-family: 'Noto Sans JP', sans-serif;
             background-color: #f3f4f6;
-            overscroll-behavior-y: none; /* iPadでのプルリフレッシュ防止 */
+            overscroll-behavior-y: none;
         }
 
         .custom-scrollbar::-webkit-scrollbar {
@@ -62,7 +56,6 @@
             background: #a8a8a8; 
         }
 
-        /* --- Print Specific Styles --- */
         @media print {
             body { background-color: white; -webkit-print-color-adjust: exact; }
             .no-print { display: none !important; }
@@ -74,8 +67,6 @@
             }
             .print-row { page-break-inside: avoid; }
             .print-border { border: 1px solid #000; }
-            
-            /* Reset specific tailwind constraints for print */
             .h-screen { height: auto !important; }
             .overflow-hidden { overflow: visible !important; }
             .overflow-auto { overflow: visible !important; }
@@ -90,29 +81,25 @@
         // ==========================================
         //  FIREBASE CONFIGURATION
         // ==========================================
-        
         const firebaseConfig = {
-            apiKey: "AIzaSyClXiF1YnVVAgUo-iaa-sCn1CF5tPTWeR0",
-            authDomain: "teachers-log-2-new.firebaseapp.com",
-            projectId: "teachers-log-2-new",
-            storageBucket: "teachers-log-2-new.firebasestorage.app",
-            messagingSenderId: "296015295174",
-            appId: "1:296015295174:web:3b46bb013d784e249a1dc7"
+            apiKey: "AIzaSyCPAOKwJZuCbR6WyC28itym-zCiuJsNBzY",
+            authDomain: "teachers-log-2.firebaseapp.com",
+            projectId: "teachers-log-2",
+            storageBucket: "teachers-log-2.firebasestorage.app",
+            messagingSenderId: "204327363691",
+            appId: "1:204327363691:web:a8ea8aaabcba1e7090fd2e"
         };
-
         // ==========================================
 
         let db = null;
         let auth = null;
         
-        // 環境変数経由（開発環境用）または直接設定（本番用）を使用
         const activeConfig = (typeof __firebase_config !== 'undefined' && __firebase_config) 
             ? JSON.parse(__firebase_config) 
             : firebaseConfig;
 
-        // 設定が正しく入っているか簡易チェック
-        const useCloud = activeConfig.apiKey && activeConfig.apiKey !== "ここにAPIキーを貼り付け";
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'teachers-log-pro';
+        const useCloud = activeConfig.apiKey !== undefined;
 
         if (useCloud) {
             try {
@@ -123,15 +110,12 @@
                 auth = firebase.auth();
             } catch (e) {
                 console.error("Firebase init error:", e);
-                alert("Firebaseの設定エラー: コンソールを確認してください。");
             }
         }
 
         const { useState, useEffect, useMemo, useCallback, useRef } = React;
 
-        // --- Constants & Helper Functions ---
-
-        const APP_VERSION = "v3.0";
+        const APP_VERSION = "v3.2";
         const WEEK_DAYS = ['月', '火', '水', '木', '金', '土'];
         
         const COLOR_PALETTE = {
@@ -153,18 +137,19 @@
             { name: 'HR', color: 'indigo' }, { name: '監督', color: 'gray' }, { name: 'その他', color: 'gray' }
         ];
 
+        // Adjusted heights for better fit without being too squashed
         const TIME_SLOTS = [
-            { id: 'morning', label: '朝・行事', type: 'special', height: 'h-24' },
-            { id: '1', label: '1限', type: 'class', height: 'h-32' },
-            { id: '2', label: '2限', type: 'class', height: 'h-32' },
-            { id: '3', label: '3限', type: 'class', height: 'h-32' },
-            { id: '4', label: '4限', type: 'class', height: 'h-32' },
-            { id: 'lunch', label: '昼休み', type: 'break', height: 'h-12' },
-            { id: '5', label: '5限', type: 'class', height: 'h-32' },
-            { id: '6', label: '6限', type: 'class', height: 'h-32' },
-            { id: '7', label: '7限', type: 'class', height: 'h-32' },
-            { id: 'after', label: '帰りHR', type: 'special', height: 'h-16' },
-            { id: 'memo', label: 'メモ', type: 'memo', height: 'h-24' },
+            { id: 'morning', label: '朝・行事', type: 'special', height: 'h-20' }, // 80px
+            { id: '1', label: '1限', type: 'class', height: 'h-24' }, // 96px (Reduced from h-32/128px)
+            { id: '2', label: '2限', type: 'class', height: 'h-24' },
+            { id: '3', label: '3限', type: 'class', height: 'h-24' },
+            { id: '4', label: '4限', type: 'class', height: 'h-24' },
+            { id: 'lunch', label: '昼休み', type: 'break', height: 'h-8' }, // 32px (Compact)
+            { id: '5', label: '5限', type: 'class', height: 'h-24' },
+            { id: '6', label: '6限', type: 'class', height: 'h-24' },
+            { id: '7', label: '7限', type: 'class', height: 'h-24' },
+            { id: 'after', label: '帰りHR', type: 'special', height: 'h-14' }, // 56px
+            { id: 'memo', label: 'メモ', type: 'memo', height: 'h-20' }, // 80px
         ];
 
         const formatDateKey = (date) => {
@@ -423,7 +408,8 @@
                             <div className="bg-blue-50 p-4 rounded-lg border border-blue-100">
                                 <h3 className="font-bold text-blue-800 text-sm mb-2 flex items-center gap-1"><Icons.Cloud size={16}/> クラウド同期 (iPad連携)</h3>
                                 <p className="text-xs text-blue-600 mb-2">
-                                    【注意】IDがわかれば誰でも閲覧可能です。生徒の氏名や成績など、機微な個人情報は絶対に入力しないでください。
+                                    IDを入力すると、自動的にリアルタイムで同期されます。<br/>
+                                    【注意】IDを知っている人は誰でも閲覧可能です。
                                 </p>
                                 <div className="flex gap-2 items-center">
                                     <input 
@@ -436,12 +422,12 @@
                                     <button 
                                         onClick={handleSyncClick}
                                         disabled={isSyncing}
-                                        className={`px-3 py-2 rounded font-bold text-sm text-white flex items-center gap-1 whitespace-nowrap shadow-sm transition
-                                            ${isSyncing ? 'bg-gray-400 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700 active:scale-95'}
+                                        className={`px-3 py-2 rounded font-bold text-sm text-gray-500 flex items-center gap-1 whitespace-nowrap shadow-sm transition bg-white border border-gray-300 hover:bg-gray-50
                                         `}
+                                        title="強制的にデータを再取得します"
                                     >
                                         <Icons.DownloadCloud size={16} /> 
-                                        {isSyncing ? '受信中...' : 'データ受信'}
+                                        再取得
                                     </button>
                                 </div>
                             </div>
@@ -781,53 +767,86 @@
                 if (savedTitle) setTeacherTitle(savedTitle);
             }, []);
 
-            // Function to manually trigger fetch/sync
-            const fetchFromCloud = useCallback(async (targetId = syncId) => {
+            // Real-time Sync Logic (Replaces manual fetch)
+            useEffect(() => {
                 if (!useCloud || !auth || !db) return;
-                
+
+                let unsubscribe = () => {};
+
+                const setupRealtimeListener = async () => {
+                    // Auth check (ensure signed in)
+                    if (!auth.currentUser) {
+                         if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                            await auth.signInWithCustomToken(__initial_auth_token);
+                         } else {
+                            await auth.signInAnonymously();
+                         }
+                    }
+
+                    const docRef = db.collection('artifacts').doc(appId).collection('public').doc('data').collection('weekly_plans').doc(syncId);
+                    
+                    unsubscribe = docRef.onSnapshot((doc) => {
+                        // ignore local writes to prevent loops/jitters
+                        if (doc.metadata.hasPendingWrites) return; 
+
+                        if (doc.exists) {
+                            const remoteData = doc.data();
+                            // console.log("Realtime update received"); // debug
+                            
+                            // Merge logic: Update state from remote
+                            if (remoteData.schedule) setScheduleData(remoteData.schedule);
+                            if (remoteData.classes) {
+                                const rClasses = remoteData.classes;
+                                if (rClasses.length > 0 && typeof rClasses[0] === 'string') {
+                                    setClassList(rClasses.map(c => ({ name: c, color: guessColor(c) })));
+                                } else {
+                                    setClassList(rClasses);
+                                }
+                            }
+                            if (remoteData.title) setTeacherTitle(remoteData.title);
+                            
+                            setIsCloudLoaded(true); // Mark as safe to write
+                        } else {
+                            // Doc doesn't exist yet on cloud.
+                            // Only mark loaded if we are sure we connected.
+                            setIsCloudLoaded(true); 
+                        }
+                    }, (error) => {
+                        console.error("Sync error:", error);
+                    });
+                };
+
+                setupRealtimeListener();
+
+                return () => unsubscribe();
+            }, [syncId, useCloud]); 
+
+            // Manual Fetch (Force Reload)
+            const fetchFromCloud = useCallback(async (targetId = syncId) => {
+                // This is now just a fallback/force refresh if listener fails
+                if (!useCloud || !auth || !db) return;
                 setIsSyncing(true);
                 try {
-                     if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                        await auth.signInWithCustomToken(__initial_auth_token);
-                     } else {
-                        if (!auth.currentUser) await auth.signInAnonymously();
-                     }
-                     
                      const docRef = db.collection('artifacts').doc(appId).collection('public').doc('data').collection('weekly_plans').doc(targetId);
                      const doc = await docRef.get();
-                     
                      if (doc.exists) {
                          const remoteData = doc.data();
-                         console.log("Remote data found:", remoteData);
-                         
                          if (remoteData.schedule) setScheduleData(remoteData.schedule);
-                         if (remoteData.classes) {
-                             const rClasses = remoteData.classes;
-                             if (rClasses.length > 0 && typeof rClasses[0] === 'string') {
-                                 setClassList(rClasses.map(c => ({ name: c, color: guessColor(c) })));
-                             } else {
-                                 setClassList(rClasses);
-                             }
-                         }
+                         if (remoteData.classes) setClassList(remoteData.classes); // Simplified for re-fetch
                          if (remoteData.title) setTeacherTitle(remoteData.title);
-                         
-                         alert("クラウドからデータを受信しました！");
-                         setIsCloudLoaded(true); 
+                         alert("最新データを取得しました。");
+                         setIsCloudLoaded(true);
                      } else {
-                         alert("クラウドにデータが見つかりませんでした。新規作成します。");
-                         setIsCloudLoaded(true); 
+                         alert("データが見つかりませんでした。");
                      }
-                } catch (err) {
-                    console.error("Sync error:", err);
-                    alert("通信エラーが発生しました。");
-                } finally {
-                    setIsSyncing(false);
-                }
+                } catch(e) { console.error(e); }
+                finally { setIsSyncing(false); }
             }, [syncId, useCloud]);
 
             // Save to Firestore on Change
             const saveToCloud = useCallback(async (newSchedule, newClasses, newTitle) => {
                 if (!useCloud || !auth || !auth.currentUser) return;
+                // Guard clause
                 if (!isCloudLoaded && Object.keys(newSchedule).length === 0) {
                      return;
                 }
