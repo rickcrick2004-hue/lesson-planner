@@ -6,12 +6,12 @@
     <title>Teacher's Log Pro</title>
     
     <!-- 
-      【Teacher's Log Pro v4.8 (Complete Build)】
+      【Teacher's Log Pro v5.3 (Color Coding)】
       
       [修正内容]
-      - v4.7で欠落していた「MonthView（月表示）」コンポーネントを復元・統合しました。
-      - コードの欠損による「MonthView is not defined」エラーを解消。
-      - これにより、週表示・月表示・履歴・集計の全機能が正常に動作します。
+      - 授業以外のスロット（Todo, 回収物, 朝, 帰り, メモ）の背景色を個別に設定。
+      - Todo: ピンク, 回収物: ブルー, 朝: 黄色, 帰り/メモ: オレンジ
+      - 視認性を向上させ、直感的に項目を判別できるようにしました。
     -->
 
     <!-- React & ReactDOM -->
@@ -125,7 +125,7 @@
 
         const { useState, useEffect, useMemo, useCallback, useRef } = React;
 
-        const APP_VERSION = "v4.8";
+        const APP_VERSION = "v5.3";
         const WEEK_DAYS = ['月', '火', '水', '木', '金', '土'];
         
         const COLOR_PALETTE = {
@@ -148,6 +148,8 @@
         ];
 
         const TIME_SLOTS = [
+            { id: 'todo', label: 'Todo', type: 'memo', height: 'h-16' },       
+            { id: 'collection', label: '回収物', type: 'memo', height: 'h-16' }, 
             { id: 'morning', label: '朝・行事', type: 'special', height: 'h-20' },
             { id: '1', label: '1限', type: 'class', height: 'h-24' },
             { id: '2', label: '2限', type: 'class', height: 'h-24' },
@@ -283,8 +285,8 @@
             const dateStr = new Date(date).toLocaleDateString('ja-JP', { month: 'long', day: 'numeric', weekday: 'long' });
 
             return (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4" onClick={onClose}>
-                    <div className="bg-white rounded-xl w-full max-w-lg shadow-2xl overflow-hidden h-[80vh] flex flex-col" onClick={e => e.stopPropagation()}>
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                    <div className="bg-white rounded-xl w-full max-w-lg shadow-2xl overflow-hidden h-[80vh] flex flex-col">
                         <div className="p-4 border-b flex justify-between items-center bg-gray-800 text-white shrink-0">
                             <div>
                                 <h2 className="text-lg font-bold">{dateStr}</h2>
@@ -905,7 +907,7 @@
                 if (savedTitle) setTeacherTitle(savedTitle);
             }, []);
 
-            // Real-time Sync Logic
+            // Real-time Sync Logic (Replaces manual fetch)
             useEffect(() => {
                 if (!useCloud || !auth || !db) return;
 
@@ -924,10 +926,14 @@
                     const docRef = db.collection('artifacts').doc(appId).collection('public').doc('data').collection('weekly_plans').doc(syncId);
                     
                     unsubscribe = docRef.onSnapshot((doc) => {
+                        // ignore local writes to prevent loops/jitters
                         if (doc.metadata.hasPendingWrites) return; 
 
                         if (doc.exists) {
                             const remoteData = doc.data();
+                            // console.log("Realtime update received"); // debug
+                            
+                            // Merge logic: Update state from remote
                             if (remoteData.schedule) setScheduleData(remoteData.schedule);
                             if (remoteData.classes) {
                                 const rClasses = remoteData.classes;
@@ -939,8 +945,10 @@
                             }
                             if (remoteData.title) setTeacherTitle(remoteData.title);
                             
-                            setIsCloudLoaded(true); 
+                            setIsCloudLoaded(true); // Mark as safe to write
                         } else {
+                            // Doc doesn't exist yet on cloud.
+                            // Only mark loaded if we are sure we connected.
                             setIsCloudLoaded(true); 
                         }
                     }, (error) => {
@@ -954,12 +962,14 @@
             }, [syncId, useCloud]); 
 
             // Save to Firestore on Change
+            // ★ UPDATED: Now returns a boolean promise indicating success
             const saveToCloud = useCallback(async (newSchedule, newClasses, newTitle) => {
                 if (!useCloud || !auth) {
-                    alert("クラウド機能が無効です。Firebase設定を確認してください。");
+                    // alert("クラウド機能が無効です。Firebase設定を確認してください。");
                     return false;
                 }
                 
+                // Ensure auth
                 if (!auth.currentUser) {
                     try {
                         await auth.signInAnonymously();
@@ -982,12 +992,12 @@
                     return true;
                 } catch (e) {
                     console.error("Cloud save failed:", e);
-                    // Detailed error message
-                    alert(`クラウド保存に失敗しました。\nエラーコード: ${e.code}\nエラー詳細: ${e.message}\n\n※「permission-denied」の場合、Firestoreのルール設定が原因です。`);
+                    alert(`クラウド保存に失敗しました。\nエラー詳細: ${e.message}\n\nFirestoreの「ルール」タブで、書き込みが許可(allow write: if true)されているか確認してください。`);
                     return false;
                 }
-            }, [syncId, useCloud]);
+            }, [syncId, useCloud]); // Removed isCloudLoaded guard for manual saves
 
+            // Manual Fetch / Connect (Smart Logic)
             const fetchFromCloud = useCallback(async (targetId = syncId) => {
                 if (!useCloud || !auth || !db) return;
                 setIsSyncing(true);
@@ -996,8 +1006,9 @@
                      const doc = await docRef.get();
                      
                      if (doc.exists) {
+                         // Data found on cloud
                          const remoteData = doc.data();
-                         if (window.confirm("【データ受信】\nクラウドに保存されたデータが見つかりました。\n\nクラウドのデータをダウンロードして、表示を上書きしますか？")) {
+                         if (window.confirm("【データ受信】\nクラウドに保存されたデータが見つかりました。\n\nクラウドのデータをダウンロードして、表示を上書きしますか？\n（※iPadなど2台目以降の場合は「OK」を押してください）")) {
                              if (remoteData.schedule) setScheduleData(remoteData.schedule);
                              if (remoteData.classes) setClassList(remoteData.classes);
                              if (remoteData.title) setTeacherTitle(remoteData.title);
@@ -1005,6 +1016,7 @@
                          }
                          setIsCloudLoaded(true);
                      } else {
+                         // Data NOT found on cloud
                          if (window.confirm("【新規作成】\nクラウドにデータがありませんでした。\n\n現在表示されているデータをクラウドに登録して、この端末を「親」として同期を開始しますか？")) {
                              await saveToCloud(scheduleData, classList, teacherTitle);
                              alert("アップロードしました。\nこれで他の端末からも同じIDでアクセスできます。");
@@ -1085,6 +1097,7 @@
                     }
                 };
                 setScheduleData(updatedSchedule);
+                // Auto-save logic: try to save, but don't alert on failure to avoid annoyance during quick edits
                 if (isCloudLoaded) {
                     saveToCloud(updatedSchedule, classList, teacherTitle);
                 }
@@ -1126,6 +1139,7 @@
             };
 
             const handleManualLoad = async () => {
+                // Manual load uses the same logic as fetchFromCloud
                 await fetchFromCloud();
             };
 
@@ -1146,35 +1160,23 @@
             const importData = (event) => {
                 const fileReader = new FileReader();
                 fileReader.readAsText(event.target.files[0], "UTF-8");
-                fileReader.onload = async e => {
-                    try {
-                        const parsed = JSON.parse(e.target.result);
-                        
-                        // バリデーション（簡易）
-                        if (!parsed.schedule && !parsed.classes) {
-                            throw new Error("無効なファイル形式です。");
-                        }
-
-                        if(parsed.schedule) setScheduleData(parsed.schedule);
-                        if(parsed.classes) {
-                             const rClasses = parsed.classes;
-                             if (rClasses.length > 0 && typeof rClasses[0] === 'string') {
-                                 setClassList(rClasses.map(c => ({ name: c, color: guessColor(c) })));
-                             } else {
-                                 setClassList(rClasses);
-                             }
-                        }
-                        if(parsed.title) setTeacherTitle(parsed.title);
-                        
-                        setIsCloudLoaded(true);
-                        saveToCloud(parsed.schedule, parsed.classes, parsed.title || teacherTitle);
-                        alert("データを復元しました。");
-                    } catch (error) {
-                        console.error(error);
-                        alert(`ファイルの読み込みに失敗しました。\nエラー: ${error.message}`);
+                fileReader.onload = e => {
+                    const parsed = JSON.parse(e.target.result);
+                    if(parsed.schedule) setScheduleData(parsed.schedule);
+                    if(parsed.classes) {
+                         const rClasses = parsed.classes;
+                         if (rClasses.length > 0 && typeof rClasses[0] === 'string') {
+                             setClassList(rClasses.map(c => ({ name: c, color: guessColor(c) })));
+                         } else {
+                             setClassList(rClasses);
+                         }
                     }
-                    // Inputをリセットして同じファイルを再度選べるようにする
-                    event.target.value = '';
+                    if(parsed.title) setTeacherTitle(parsed.title);
+                    
+                    setIsCloudLoaded(true);
+                    // Try auto save after import
+                    saveToCloud(parsed.schedule, parsed.classes, parsed.title || teacherTitle);
+                    alert("データを復元しました。");
                 };
             };
 
@@ -1195,12 +1197,26 @@
                     return `${theme.bgLight} ${theme.text}`;
                 };
 
+                // 背景色の決定ロジック (v5.3 Updated)
+                let bgClass = 'bg-white';
+                if (slot.id === 'lunch') {
+                    bgClass = 'bg-gray-100 text-center flex items-center justify-center text-gray-400 print:text-black print:bg-gray-100';
+                } else if (slot.id === 'todo') {
+                    bgClass = 'bg-red-50'; // 薄いピンク
+                } else if (slot.id === 'collection') {
+                    bgClass = 'bg-blue-50'; // 薄いブルー
+                } else if (slot.id === 'morning') {
+                    bgClass = 'bg-yellow-50'; // 薄い黄色
+                } else if (['after', 'memo'].includes(slot.id)) {
+                    bgClass = 'bg-orange-50'; // 薄いオレンジ
+                }
+
                 return (
                     <div 
                         className={`
                             border-b border-r border-gray-200 p-1 text-xs relative cursor-pointer hover:bg-blue-50 transition-colors
                             ${slot.height} overflow-hidden group
-                            ${slot.id === 'lunch' ? 'bg-gray-100 text-center flex items-center justify-center text-gray-400 print:text-black print:bg-gray-100' : 'bg-white'}
+                            ${bgClass}
                             print-row
                         `}
                         onClick={() => handleSlotClick(date, slot.id)}
@@ -1340,11 +1356,19 @@
                                             ))}
                                         </div>
 
-                                        {TIME_SLOTS.map(slot => (
+                                        {TIME_SLOTS.map(slot => {
+                                            let labelBgClass = 'bg-gray-50';
+                                            if (slot.id === 'lunch') labelBgClass = 'bg-gray-100';
+                                            else if (slot.id === 'todo') labelBgClass = 'bg-red-100';
+                                            else if (slot.id === 'collection') labelBgClass = 'bg-blue-100';
+                                            else if (slot.id === 'morning') labelBgClass = 'bg-yellow-100';
+                                            else if (['after', 'memo'].includes(slot.id)) labelBgClass = 'bg-orange-100';
+
+                                            return (
                                             <div key={slot.id} className="grid grid-cols-[80px_repeat(6,1fr)] hover:bg-gray-50 transition-colors print:hover:bg-transparent print-row">
                                                 <div className={`
-                                                    border-b border-r border-gray-200 flex items-center justify-center text-xs font-bold text-gray-600 bg-gray-50 print:bg-white print:text-black print:border-black
-                                                    ${slot.id === 'lunch' ? 'bg-gray-100' : ''}
+                                                    border-b border-r border-gray-200 flex items-center justify-center text-xs font-bold text-gray-600 print:bg-white print:text-black print:border-black
+                                                    ${labelBgClass}
                                                 `}>
                                                     {slot.label}
                                                 </div>
@@ -1359,7 +1383,7 @@
                                                     </div>
                                                 ))}
                                             </div>
-                                        ))}
+                                        )})}
                                     </div>
                                 </div>
                             )}
