@@ -5,15 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Teacher's Log Pro</title>
     
-    <!-- 
-      【Teacher's Log Pro v5.3 (Color Coding)】
-      
-      [修正内容]
-      - 授業以外のスロット（Todo, 回収物, 朝, 帰り, メモ）の背景色を個別に設定。
-      - Todo: ピンク, 回収物: ブルー, 朝: 黄色, 帰り/メモ: オレンジ
-      - 視認性を向上させ、直感的に項目を判別できるようにしました。
-    -->
-
     <!-- React & ReactDOM -->
     <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
@@ -29,44 +20,20 @@
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
 
-    <!-- Lucide Icons -->
-    <script src="https://unpkg.com/lucide@latest"></script>
-
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&display=swap');
         
-        body {
-            font-family: 'Noto Sans JP', sans-serif;
-            background-color: #f3f4f6;
-            overscroll-behavior-y: none;
-        }
-
-        .custom-scrollbar::-webkit-scrollbar {
-            width: 8px;
-            height: 8px;
-        }
-        .custom-scrollbar::-webkit-scrollbar-track {
-            background: #f1f1f1; 
-        }
-        .custom-scrollbar::-webkit-scrollbar-thumb {
-            background: #c1c1c1; 
-            border-radius: 4px;
-        }
-        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-            background: #a8a8a8; 
-        }
+        body { font-family: 'Noto Sans JP', sans-serif; background-color: #f3f4f6; overscroll-behavior-y: none; }
+        .custom-scrollbar::-webkit-scrollbar { width: 8px; height: 8px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: #f1f1f1; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #c1c1c1; border-radius: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #a8a8a8; }
 
         @media print {
             body { background-color: white; -webkit-print-color-adjust: exact; }
             .no-print { display: none !important; }
             .print-only { display: block !important; }
-            .print-container { 
-                width: 100%; 
-                border: 1px solid #000;
-                font-size: 10pt;
-            }
             .print-row { page-break-inside: avoid; }
-            .print-border { border: 1px solid #000; }
             .h-screen { height: auto !important; }
             .overflow-hidden { overflow: visible !important; }
             .overflow-auto { overflow: visible !important; }
@@ -78,65 +45,59 @@
     <div id="root"></div>
 
     <script type="text/babel">
-        // ==========================================
-        //  FIREBASE CONFIGURATION (Default)
-        // ==========================================
-        // ※ 設定画面から入力された値が優先されます
-        const defaultFirebaseConfig = {
-            apiKey: "", 
-            authDomain: "",
-            projectId: ""
-        };
-        // ==========================================
-
+        // Firebase Setup
+        const defaultFirebaseConfig = { apiKey: "", authDomain: "", projectId: "" };
         let db = null;
         let auth = null;
         
-        // 1. LocalStorageから設定を読み込む
         const savedConfigStr = localStorage.getItem('teacherLogFirebaseConfig');
         let activeConfig = defaultFirebaseConfig;
-        
-        if (savedConfigStr) {
-            try {
-                activeConfig = JSON.parse(savedConfigStr);
-            } catch (e) {
-                console.error("Failed to parse saved config", e);
-            }
-        } else if (typeof __firebase_config !== 'undefined' && __firebase_config) {
-            activeConfig = JSON.parse(__firebase_config);
-        }
+        if (savedConfigStr) { try { activeConfig = JSON.parse(savedConfigStr); } catch (e) {} }
 
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'teachers-log-pro';
+        const savedAppId = localStorage.getItem('teacherLogAppId');
+        const initialAppId = savedAppId || (typeof __app_id !== 'undefined' ? __app_id : 'teachers-log-pro');
         const useCloud = activeConfig.apiKey !== undefined && activeConfig.apiKey !== "";
 
         if (useCloud) {
             try {
-                if (!firebase.apps.length) {
-                    firebase.initializeApp(activeConfig);
-                }
+                if (!firebase.apps.length) firebase.initializeApp(activeConfig);
                 db = firebase.firestore();
-                // 接続安定化のための設定
                 db.settings({ experimentalForceLongPolling: true });
                 auth = firebase.auth();
-            } catch (e) {
-                console.error("Firebase init error:", e);
+            } catch (e) { console.error("Firebase init error:", e); }
+        }
+
+        const { useState, useEffect, useMemo, useCallback, Component } = React;
+        const APP_VERSION = "6.1.5"; // デバッグ・安全性強化版
+
+        class ErrorBoundary extends Component {
+            constructor(props) { super(props); this.state = { hasError: false, error: null }; }
+            static getDerivedStateFromError(error) { return { hasError: true, error }; }
+            render() {
+                if (this.state.hasError) {
+                    return (
+                        <div className="min-h-screen bg-red-50 flex items-center justify-center p-4">
+                            <div className="bg-white p-6 rounded shadow-xl text-center border border-red-200">
+                                <h1 className="text-xl font-bold text-red-700 mb-2">エラーが発生しました</h1>
+                                <p className="text-gray-600 mb-4">{this.state.error?.message || "予期せぬエラーが発生しました"}</p>
+                                <button onClick={() => window.location.reload()} className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 transition">アプリを再読み込み</button>
+                            </div>
+                        </div>
+                    );
+                }
+                return this.props.children;
             }
         }
 
-        const { useState, useEffect, useMemo, useCallback, useRef } = React;
-
-        const APP_VERSION = "v5.3";
         const WEEK_DAYS = ['月', '火', '水', '木', '金', '土'];
-        
         const COLOR_PALETTE = {
-            red: { label: '赤', bg: 'bg-red-500', bgLight: 'bg-red-100', text: 'text-red-800', border: 'border-red-600', ring: 'ring-red-500' },
-            orange: { label: '橙', bg: 'bg-orange-500', bgLight: 'bg-orange-100', text: 'text-orange-800', border: 'border-orange-600', ring: 'ring-orange-500' },
-            yellow: { label: '黄', bg: 'bg-yellow-400', bgLight: 'bg-yellow-100', text: 'text-yellow-800', border: 'border-yellow-500', ring: 'ring-yellow-400' },
-            green: { label: '緑', bg: 'bg-green-500', bgLight: 'bg-green-100', text: 'text-green-800', border: 'border-green-600', ring: 'ring-green-500' },
-            blue: { label: '青', bg: 'bg-blue-500', bgLight: 'bg-blue-100', text: 'text-blue-800', border: 'border-blue-600', ring: 'ring-blue-500' },
-            indigo: { label: '藍', bg: 'bg-indigo-500', bgLight: 'bg-indigo-100', text: 'text-indigo-800', border: 'border-indigo-600', ring: 'ring-indigo-500' },
-            purple: { label: '紫', bg: 'bg-purple-500', bgLight: 'bg-purple-100', text: 'text-purple-800', border: 'border-purple-600', ring: 'ring-purple-500' },
-            gray: { label: '灰', bg: 'bg-gray-500', bgLight: 'bg-gray-100', text: 'text-gray-800', border: 'border-gray-600', ring: 'ring-gray-500' },
+            red: { bg: 'bg-red-500', bgLight: 'bg-red-100', text: 'text-red-800', border: 'border-red-600', ring: 'ring-red-500' },
+            orange: { bg: 'bg-orange-500', bgLight: 'bg-orange-100', text: 'text-orange-800', border: 'border-orange-600', ring: 'ring-orange-500' },
+            yellow: { bg: 'bg-yellow-400', bgLight: 'bg-yellow-100', text: 'text-yellow-800', border: 'border-yellow-500', ring: 'ring-yellow-400' },
+            green: { bg: 'bg-green-500', bgLight: 'bg-green-100', text: 'text-green-800', border: 'border-green-600', ring: 'ring-green-500' },
+            blue: { bg: 'bg-blue-500', bgLight: 'bg-blue-100', text: 'text-blue-800', border: 'border-blue-600', ring: 'ring-blue-500' },
+            indigo: { bg: 'bg-indigo-500', bgLight: 'bg-indigo-100', text: 'text-indigo-800', border: 'border-indigo-600', ring: 'ring-indigo-500' },
+            gray: { bg: 'bg-gray-500', bgLight: 'bg-gray-100', text: 'text-gray-800', border: 'border-gray-600', ring: 'ring-gray-500' }
         };
 
         const DEFAULT_CLASSES = [
@@ -144,7 +105,7 @@
             { name: '2A', color: 'green' }, { name: '2B', color: 'green' }, 
             { name: '3A', color: 'blue' }, { name: '3B', color: 'blue' },   
             { name: '道徳', color: 'yellow' }, { name: '総学', color: 'orange' },
-            { name: 'HR', color: 'indigo' }, { name: '監督', color: 'gray' }, { name: 'その他', color: 'gray' }
+            { name: 'HR', color: 'indigo' }, { name: '監督', color: 'gray' }
         ];
 
         const TIME_SLOTS = [
@@ -160,24 +121,18 @@
             { id: '6', label: '6限', type: 'class', height: 'h-24' },
             { id: '7', label: '7限', type: 'class', height: 'h-24' },
             { id: 'after', label: '帰りHR', type: 'special', height: 'h-14' },
-            { id: 'memo', label: 'メモ', type: 'memo', height: 'h-20' },
+            { id: 'memo', label: 'メモ', type: 'memo', height: 'h-20' }
         ];
 
-        const formatDateKey = (date) => {
-            const d = new Date(date);
-            return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-        };
-
         const getMonday = (d) => {
-            d = new Date(d);
-            const day = d.getDay();
-            const diff = d.getDate() - day + (day === 0 ? -6 : 1); 
-            return new Date(d.setDate(diff));
+            const nd = new Date(d);
+            const day = nd.getDay();
+            const diff = nd.getDate() - day + (day === 0 ? -6 : 1); 
+            return new Date(nd.setDate(diff));
         };
-
-        const generateId = () => Math.random().toString(36).substring(2, 10).toUpperCase();
 
         const guessColor = (name) => {
+            if (!name) return 'gray';
             if (name.startsWith('1')) return 'red';
             if (name.startsWith('2')) return 'green';
             if (name.startsWith('3')) return 'blue'; 
@@ -186,676 +141,209 @@
             return 'gray';
         };
 
-        // Icons
-        const Icons = {
-            ChevronLeft: ({size = 24, className = ""}) => <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="m15 18-6-6 6-6"/></svg>,
-            ChevronRight: ({size = 24, className = ""}) => <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="m9 18 6-6-6-6"/></svg>,
-            Calendar: ({size = 20, className = ""}) => <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><rect width="18" height="18" x="3" y="4" rx="2" ry="2"/><line x1="16" x2="16" y1="2" y2="6"/><line x1="8" x2="8" y1="2" y2="6"/><line x1="3" x2="21" y1="10" y2="10"/></svg>,
-            List: ({size = 20, className = ""}) => <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><line x1="8" x2="21" y1="6" y2="6"/><line x1="8" x2="21" y1="12" y2="12"/><line x1="8" x2="21" y1="18" y2="18"/><line x1="3" x2="3.01" y1="6" y2="6"/><line x1="3" x2="3.01" y1="12" y2="12"/><line x1="3" x2="3.01" y1="18" y2="18"/></svg>,
-            Settings: ({size = 20, className = ""}) => <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.09a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>,
-            Download: ({size = 20, className = ""}) => <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>,
-            Upload: ({size = 20, className = ""}) => <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" x2="12" y1="3" y2="15"/></svg>,
-            X: ({size = 24, className = ""}) => <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>,
-            BarChart: ({size = 20, className = ""}) => <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><line x1="12" x2="12" y1="20" y2="10"/><line x1="18" x2="18" y1="20" y2="4"/><line x1="6" x2="6" y1="20" y2="16"/></svg>,
-            Cloud: ({size = 20, className = ""}) => <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M17.5 19c0-3.037-2.463-5.5-5.5-5.5S6.5 15.963 6.5 19"/><path d="M20 16.952c1.235-.976 2-2.528 2-4.162 0-2.761-2.238-5-5-5-.403 0-.792.051-1.168.146C15.394 5.378 13.068 4 10.5 4 6.91 4 4 6.91 4 10.5c0 1.637.595 3.125 1.583 4.29"/></svg>,
-            Plus: ({size = 20, className = ""}) => <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><line x1="12" x2="12" y1="5" y2="19"/><line x1="5" x2="19" y1="12" y2="12"/></svg>,
-            Trash: ({size = 16, className = ""}) => <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>,
-            DownloadCloud: ({size = 16, className = ""}) => <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M4 14.899A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242"/><path d="M12 12v9"/><path d="m8 17 4 4 4-4"/></svg>,
-            Printer: ({size = 20, className = ""}) => <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect width="12" height="8" x="6" y="14"/></svg>,
-            Search: ({size = 20, className = ""}) => <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><circle cx="11" cy="11" r="8"/><line x1="21" x2="16.65" y1="21" y2="16.65"/></svg>,
-            Save: ({size = 20, className = ""}) => <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>,
-            RefreshCw: ({size = 20, className = ""}) => <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg>,
-            Wifi: ({size = 16, className = ""}) => <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M1.42 9a16 16 0 0 1 21.16 0"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><line x1="12" y1="20" x2="12.01" y2="20"/></svg>,
-            ClipboardCheck: ({size = 16, className = ""}) => <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><rect width="8" height="4" x="8" y="2" rx="1" ry="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="m9 14 2 2 4-4"/></svg>,
+        const formatDateKey = (date) => {
+            const d = new Date(date);
+            return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
         };
 
-        // --- Components ---
+        const generateId = () => Math.random().toString(36).substring(2, 10).toUpperCase();
+
+        const Icons = {
+            ChevronLeft: ({size=24, className=""}) => <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="m15 18-6-6 6-6"/></svg>,
+            ChevronRight: ({size=24, className=""}) => <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="m9 18 6-6-6-6"/></svg>,
+            Calendar: ({size=20, className=""}) => <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><rect width="18" height="18" x="3" y="4" rx="2" ry="2"/><line x1="16" x2="16" y1="2" y2="6"/><line x1="8" x2="8" y1="2" y2="6"/><line x1="3" x2="21" y1="10" y2="10"/></svg>,
+            List: ({size=20, className=""}) => <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><line x1="8" x2="21" y1="6" y2="6"/><line x1="8" x2="21" y1="12" y2="12"/><line x1="8" x2="21" y1="18" y2="18"/><line x1="3" x2="3.01" y1="6" y2="6"/><line x1="3" x2="3.01" y1="12" y2="12"/><line x1="3" x2="3.01" y1="18" y2="18"/></svg>,
+            Settings: ({size=20, className=""}) => <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>,
+            Download: ({size=20, className=""}) => <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>,
+            Upload: ({size=20, className=""}) => <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" x2="12" y1="3" y2="15"/></svg>,
+            X: ({size=24, className=""}) => <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>,
+            BarChart: ({size=20, className=""}) => <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><line x1="12" x2="12" y1="20" y2="10"/><line x1="18" x2="18" y1="20" y2="4"/><line x1="6" x2="6" y1="20" y2="16"/></svg>,
+            Cloud: ({size=20, className=""}) => <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M17.5 19c0-3.037-2.463-5.5-5.5-5.5S6.5 15.963 6.5 19"/><path d="M20 16.952c1.235-.976 2-2.528 2-4.162 0-2.761-2.238-5-5-5-.403 0-.792.051-1.168.146C15.394 5.378 13.068 4 10.5 4 6.91 4 4 6.91 4 10.5c0 1.637.595 3.125 1.583 4.29"/></svg>,
+            Trash: ({size=16, className=""}) => <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>,
+            Wifi: ({size=16, className=""}) => <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M1.42 9a16 16 0 0 1 21.16 0"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><line x1="12" y1="20" x2="12.01" y2="20"/></svg>,
+            Database: ({size=16, className=""}) => <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>,
+            Printer: ({size=20, className=""}) => <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect width="12" height="8" x="6" y="14"/></svg>,
+            Search: ({size=20, className=""}) => <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+        };
+
+        // --- Views & Modals ---
 
         const ClassSelector = ({ selectedClass, onSelect, classes }) => {
-            const getButtonStyle = (clsObj) => {
-                const base = "px-3 py-2 rounded-lg text-sm font-bold border transition-all shadow-sm ";
-                const isSelected = selectedClass === clsObj.name;
-                const colorTheme = COLOR_PALETTE[clsObj.color || 'gray'];
-                
-                let colorClass = "";
-                if (isSelected) {
-                    colorClass = `${colorTheme.bg} text-white ${colorTheme.border} ring-2 ring-offset-1 ${colorTheme.ring} transform scale-105 z-10`;
-                } else {
-                    colorClass = `${colorTheme.bgLight} ${colorTheme.text} border-gray-200 opacity-80 hover:opacity-100 hover:scale-105`;
-                }
-
-                return `${base} ${colorClass}`;
-            };
-
             return (
                 <div className="flex flex-wrap gap-2">
-                    {classes.map((c, idx) => (
-                        <button
-                            key={`${c.name}-${idx}`}
-                            onClick={() => onSelect(c.name)}
-                            className={getButtonStyle(c)}
-                        >
-                            {c.name}
-                        </button>
-                    ))}
+                    {classes.map((c, idx) => {
+                        const isSel = selectedClass === c.name;
+                        const t = COLOR_PALETTE[c.color || 'gray'];
+                        const cls = isSel ? (t.bg + " text-white " + t.border + " ring-2 ring-offset-1 " + t.ring + " scale-105") : (t.bgLight + " " + t.text + " border-gray-200 opacity-80 hover:opacity-100 hover:scale-105");
+                        return (
+                            <button key={idx} onClick={() => onSelect(c.name)} className={"px-3 py-2 rounded-lg text-sm font-bold border transition-all shadow-sm " + cls}>
+                                {c.name}
+                            </button>
+                        );
+                    })}
                 </div>
             );
         };
 
         const SlotModal = ({ isOpen, onClose, date, slotId, data, onSave, classOptions }) => {
             if (!isOpen) return null;
-
             const slotDef = TIME_SLOTS.find(s => s.id === slotId);
-            const isClassSlot = slotDef?.type === 'class';
-            // Default to empty string (no class selected)
-            const defaultClassId = '';
-            const initialData = data || { plan: '', actual: '', classId: defaultClassId, memo: '' };
+            const isClass = slotDef?.type === 'class';
+            const [localData, setLocalData] = useState(data || { plan: '', actual: '', classId: '', memo: '' });
 
-            const [localData, setLocalData] = useState(initialData);
+            useEffect(() => { setLocalData(data || { plan: '', actual: '', classId: '', memo: '' }); }, [data, isOpen]);
 
-            useEffect(() => {
-                let loadedData = data || { plan: '', actual: '', classId: defaultClassId, memo: '' };
-                if (!isClassSlot && loadedData.actual && !loadedData.plan.includes(loadedData.actual)) {
-                    loadedData = { 
-                        ...loadedData, 
-                        plan: loadedData.plan ? `${loadedData.plan}\n\n---\n${loadedData.actual}` : loadedData.actual,
-                        actual: ''
-                    };
-                }
-                setLocalData(loadedData);
-            }, [data, slotId, isClassSlot, defaultClassId, isOpen]);
-
-            const handleChange = (field, value) => {
-                setLocalData(prev => ({ ...prev, [field]: value }));
-            };
-
-            const handleSave = () => {
-                onSave(date, slotId, localData);
-                onClose();
-            };
-            
-            const handleClassSelect = (clsName) => {
-                if (localData.classId === clsName) {
-                    handleChange('classId', '');
-                } else {
-                    handleChange('classId', clsName);
-                }
-            };
-
-            const dateStr = new Date(date).toLocaleDateString('ja-JP', { month: 'long', day: 'numeric', weekday: 'long' });
+            const dStr = new Date(date).toLocaleDateString('ja-JP', { month: 'long', day: 'numeric', weekday: 'long' });
 
             return (
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-                    <div className="bg-white rounded-xl w-full max-w-lg shadow-2xl overflow-hidden h-[80vh] flex flex-col">
-                        <div className="p-4 border-b flex justify-between items-center bg-gray-800 text-white shrink-0">
-                            <div>
-                                <h2 className="text-lg font-bold">{dateStr}</h2>
-                                <span className="text-sm bg-gray-700 px-2 py-0.5 rounded text-gray-200">{slotDef?.label}</span>
-                            </div>
-                            <button onClick={onClose} className="hover:bg-gray-700 p-2 rounded-full transition"><Icons.X /></button>
+                    <div className="bg-white rounded-xl w-full max-w-lg shadow-2xl flex flex-col h-[80vh]">
+                        <div className="p-4 border-b bg-gray-800 text-white flex justify-between items-center shrink-0">
+                            <div><h2 className="text-lg font-bold">{dStr}</h2><span className="text-sm bg-gray-700 px-2 py-0.5 rounded">{slotDef?.label}</span></div>
+                            <button onClick={onClose} className="p-2 hover:bg-gray-700 rounded-full"><Icons.X /></button>
                         </div>
-                        
-                        <div className="p-5 overflow-y-auto custom-scrollbar flex-1 flex flex-col">
-                            {isClassSlot ? (
-                                <>
-                                    <div className="mb-6 shrink-0">
-                                        <label className="block text-xs font-bold text-gray-500 mb-2 uppercase tracking-wide">クラス選択（タップで解除）</label>
-                                        <ClassSelector 
-                                            selectedClass={localData.classId} 
-                                            onSelect={handleClassSelect} 
-                                            classes={classOptions} 
-                                        />
-                                    </div>
-
-                                    <div className="space-y-4">
-                                        <div className="space-y-1">
-                                            <div className="flex items-center justify-between">
-                                                <label className="text-sm font-bold text-gray-700">予定 (Plan)</label>
-                                            </div>
-                                            <textarea 
-                                                className="w-full border-2 border-gray-200 rounded-lg p-3 text-base min-h-[100px] focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                                                placeholder="指導のねらい、活動内容..."
-                                                value={localData.plan || ''}
-                                                onChange={(e) => handleChange('plan', e.target.value)}
-                                            />
-                                        </div>
-                                        
-                                        <div className="space-y-1">
-                                            <label className="text-sm font-bold text-gray-700">実施記録・振り返り (Actual)</label>
-                                            <textarea 
-                                                className="w-full border-2 border-yellow-100 bg-yellow-50 rounded-lg p-3 text-base min-h-[80px] focus:ring-2 focus:ring-yellow-400 focus:border-transparent transition-all"
-                                                placeholder="生徒の様子、変更点、メモ..."
-                                                value={localData.actual || ''}
-                                                onChange={(e) => handleChange('actual', e.target.value)}
-                                            />
-                                        </div>
-                                    </div>
-                                </>
-                            ) : (
-                                <div className="flex-1 flex flex-col h-full">
-                                    <label className="block text-sm font-bold text-gray-700 mb-2">内容</label>
-                                    <textarea 
-                                        className="w-full border-2 border-gray-200 rounded-lg p-4 text-base flex-1 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all resize-none leading-relaxed"
-                                        placeholder="内容、連絡事項、行事の詳細など..."
-                                        value={localData.plan || ''}
-                                        onChange={(e) => handleChange('plan', e.target.value)}
-                                    />
+                        <div className="p-5 overflow-y-auto flex-1 space-y-4 custom-scrollbar">
+                            {isClass && (
+                                <div>
+                                    <label className="block text-xs font-bold text-gray-500 mb-2">クラス</label>
+                                    <ClassSelector selectedClass={localData.classId} onSelect={c => setLocalData({...localData, classId: c===localData.classId?'':c})} classes={classOptions} />
+                                </div>
+                            )}
+                            <div className="flex-1 flex flex-col space-y-2">
+                                <label className="block text-sm font-bold text-gray-700">{isClass ? '予定' : '内容'}</label>
+                                <textarea className="w-full border-2 border-gray-200 rounded-lg p-3 min-h-[100px]" value={localData.plan || ''} onChange={e => setLocalData({...localData, plan: e.target.value})} />
+                            </div>
+                            {isClass && (
+                                <div className="space-y-2">
+                                    <label className="block text-sm font-bold text-gray-700">実施記録・振り返り</label>
+                                    <textarea className="w-full border-2 border-yellow-100 bg-yellow-50 rounded-lg p-3 min-h-[80px]" value={localData.actual || ''} onChange={e => setLocalData({...localData, actual: e.target.value})} />
                                 </div>
                             )}
                         </div>
-
                         <div className="p-4 border-t bg-gray-50 flex justify-end gap-3 shrink-0">
-                            <button onClick={onClose} className="px-5 py-2.5 rounded-lg text-gray-600 hover:bg-gray-200 font-medium transition">キャンセル</button>
-                            <button onClick={handleSave} className="px-8 py-2.5 rounded-lg bg-blue-600 text-white hover:bg-blue-700 font-bold shadow-md transform active:scale-95 transition">
-                                保存
-                            </button>
+                            <button onClick={onClose} className="px-5 py-2 rounded text-gray-600 hover:bg-gray-200 font-bold">キャンセル</button>
+                            <button onClick={() => { onSave(date, slotId, localData); onClose(); }} className="px-8 py-2 rounded bg-blue-600 text-white font-bold shadow hover:bg-blue-700">保存</button>
                         </div>
                     </div>
                 </div>
             );
         };
 
-        const SettingsModal = ({ isOpen, onClose, classes, onUpdateClasses, syncId, onUpdateSyncId, onTriggerSync, isSyncing, teacherTitle, onUpdateTeacherTitle }) => {
+        const SettingsModal = ({ isOpen, onClose, classes, onUpdateClasses, syncId, onUpdateSyncId, appId, onUpdateAppId, onTriggerSync, isSyncing, title, onUpdateTitle }) => {
             if (!isOpen) return null;
-            const [localClasses, setLocalClasses] = useState([...classes]);
-            const [localSyncId, setLocalSyncId] = useState(syncId);
-            const [localTeacherTitle, setLocalTeacherTitle] = useState(teacherTitle);
-            const [configInput, setConfigInput] = useState('');
-
-            useEffect(() => {
-                setLocalClasses([...classes]);
-            }, [classes]);
-
-            useEffect(() => {
-                setLocalTeacherTitle(teacherTitle);
-            }, [teacherTitle]);
+            const [lClasses, setLClasses] = useState([...classes]);
+            const [lSyncId, setLSyncId] = useState(syncId);
+            const [lAppId, setLAppId] = useState(appId);
+            const [lTitle, setLTitle] = useState(title);
+            const [configIn, setConfigIn] = useState('');
 
             const handleSave = () => {
-                const filtered = localClasses.filter(c => c.name.trim() !== '');
-                onUpdateClasses(filtered);
-                onUpdateSyncId(localSyncId);
-                onUpdateTeacherTitle(localTeacherTitle);
+                onUpdateClasses(lClasses.filter(c => c.name.trim() !== ''));
+                onUpdateSyncId(lSyncId); onUpdateAppId(lAppId); onUpdateTitle(lTitle);
                 onClose();
             };
-            
-            const handleSyncClick = () => {
-                onUpdateSyncId(localSyncId);
-                onTriggerSync(localSyncId);
-            };
 
-            const addClass = () => {
-                setLocalClasses([...localClasses, { name: '', color: 'gray' }]);
-            };
-
-            const removeClass = (index) => {
-                const newClasses = [...localClasses];
-                newClasses.splice(index, 1);
-                setLocalClasses(newClasses);
-            };
-
-            const updateClass = (index, field, value) => {
-                const newClasses = [...localClasses];
-                newClasses[index] = { ...newClasses[index], [field]: value };
-                setLocalClasses(newClasses);
-            };
-
-            const handleConfigSave = () => {
-                if (!configInput.trim()) return;
-                
+            const parseConfig = () => {
+                if (!configIn.trim()) return;
                 try {
-                    // Extract key-value pairs using regex to avoid eval() and strict JSON requirements
-                    const extract = (key, text) => {
-                        // Look for key: "value" or key: 'value' (handling whitespace)
-                        const regex = new RegExp(`${key}\\s*:\\s*["']([^"']+)["']`);
-                        const match = text.match(regex);
-                        return match ? match[1] : null;
-                    };
-
-                    const apiKey = extract('apiKey', configInput);
-                    const authDomain = extract('authDomain', configInput);
-                    const projectId = extract('projectId', configInput);
-                    const storageBucket = extract('storageBucket', configInput);
-                    const messagingSenderId = extract('messagingSenderId', configInput);
-                    const appId = extract('appId', configInput);
-
-                    if (apiKey && projectId) {
-                        const configObj = {
-                            apiKey, authDomain, projectId, storageBucket, messagingSenderId, appId
-                        };
-                        localStorage.setItem('teacherLogFirebaseConfig', JSON.stringify(configObj));
-                        if(confirm("Firebase設定を保存しました。反映するためにページを再読み込みしますか？")) {
-                            window.location.reload();
-                        }
-                    } else {
-                        alert("有効なFirebase設定が見つかりませんでした。\n「apiKey」や「projectId」が含まれているか確認してください。");
+                    const ex = (k, t) => { const m = t.match(new RegExp(k + "\\s*:\\s*[\"']([^\"]+)[\"']")); return m ? m[1] : null; };
+                    const apiKey = ex('apiKey', configIn);
+                    if (apiKey) {
+                        localStorage.setItem('teacherLogFirebaseConfig', JSON.stringify({ apiKey, projectId: ex('projectId', configIn), authDomain: ex('authDomain', configIn) }));
+                        if (confirm("設定を保存しました。リロードしますか？")) window.location.reload();
                     }
-                } catch (e) {
-                    console.error(e);
-                    alert("設定の解析に失敗しました。コピーした内容が正しいか確認してください。");
-                }
+                } catch (e) { alert("解析エラー"); }
             };
 
             return (
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
                     <div className="bg-white rounded-lg p-6 w-full max-w-lg max-h-[90vh] flex flex-col">
-                        <h2 className="text-xl font-bold mb-4 flex items-center gap-2 flex-shrink-0"><Icons.Settings size={20}/> 設定</h2>
-                        
-                        <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 space-y-6">
-                            
-                            {/* Title Settings Section */}
-                            <div className="mb-4">
-                                <label className="block text-sm font-bold text-gray-700 mb-2">肩書き・担任名</label>
-                                <div className="flex gap-2">
-                                    <input 
-                                        type="text"
-                                        className="w-full border-2 border-gray-200 rounded p-2 text-base focus:ring-2 focus:ring-blue-500"
-                                        value={localTeacherTitle}
-                                        onChange={(e) => setLocalTeacherTitle(e.target.value)}
-                                        placeholder="例: 1年A組 担任"
-                                    />
-                                </div>
-                            </div>
-
-                            {/* Sync Section */}
-                            <div className="bg-blue-50 p-4 rounded-lg border border-blue-100">
-                                <h3 className="font-bold text-blue-800 text-sm mb-2 flex items-center gap-1"><Icons.Cloud size={16}/> クラウド同期 (iPad連携)</h3>
-                                <p className="text-xs text-blue-600 mb-2">
-                                    IDを入力して「接続」を押すと、同期を開始します。<br/>
-                                    【注意】IDを知っている人は誰でも閲覧可能です。
-                                </p>
-                                <div className="flex gap-2 items-center">
-                                    <input 
-                                        type="text"
-                                        className="flex-1 border-2 border-blue-200 rounded p-2 text-center font-mono font-bold text-lg tracking-widest text-blue-900 focus:ring-2 focus:ring-blue-500"
-                                        value={localSyncId}
-                                        onChange={(e) => setLocalSyncId(e.target.value)}
-                                        placeholder="SYNC_ID"
-                                    />
-                                    <button 
-                                        onClick={handleSyncClick}
-                                        disabled={isSyncing}
-                                        className={`px-3 py-2 rounded font-bold text-sm text-white flex items-center gap-1 whitespace-nowrap shadow-sm transition
-                                            ${isSyncing ? 'bg-gray-400 cursor-not-allowed' : 'bg-green-600 hover:bg-green-700 active:scale-95'}
-                                        `}
-                                        title="クラウドと接続し、状態を確認します"
-                                    >
-                                        <Icons.Wifi size={16} /> 
-                                        接続
-                                    </button>
-                                </div>
-                            </div>
-
-                            {/* Advanced Config Section */}
-                            <div className="bg-gray-100 p-4 rounded-lg border border-gray-200">
-                                <h3 className="font-bold text-gray-700 text-sm mb-2 flex items-center gap-1"><Icons.ClipboardCheck size={16}/> Firebase設定の上書き (上級者向け)</h3>
-                                <p className="text-xs text-gray-600 mb-2">
-                                    Firebaseコンソールからコピーしたコード（<code>const firebaseConfig = ...</code>）をそのまま貼り付けて更新できます。
-                                </p>
-                                <textarea 
-                                    className="w-full border rounded p-2 text-xs font-mono h-20 mb-2"
-                                    placeholder='const firebaseConfig = { apiKey: "..." ... };'
-                                    value={configInput}
-                                    onChange={(e) => setConfigInput(e.target.value)}
-                                />
-                                <div className="text-right">
-                                    <button 
-                                        onClick={handleConfigSave}
-                                        className="px-3 py-1 bg-gray-600 text-white text-xs rounded hover:bg-gray-700 transition"
-                                    >
-                                        設定を更新してリロード
-                                    </button>
-                                </div>
-                            </div>
-
-                            {/* Class Settings Section */}
+                        <h2 className="text-xl font-bold mb-4 flex items-center gap-2 shrink-0"><Icons.Settings/>設定</h2>
+                        <div className="flex-1 overflow-y-auto space-y-6 custom-scrollbar pr-2">
                             <div>
-                                <div className="flex justify-between items-center mb-2">
-                                    <label className="block text-sm font-bold text-gray-700">クラス・科目設定</label>
-                                    <button onClick={addClass} className="flex items-center gap-1 text-xs bg-green-100 text-green-700 px-2 py-1 rounded hover:bg-green-200 font-bold">
-                                        <Icons.Plus size={14} /> 追加
-                                    </button>
-                                </div>
-                                
-                                <div className="space-y-2">
-                                    {localClasses.map((cls, idx) => (
-                                        <div key={idx} className="flex gap-2 items-center">
-                                            <input 
-                                                type="text" 
-                                                placeholder="クラス名"
-                                                className="border rounded p-2 flex-1 text-sm"
-                                                value={cls.name}
-                                                onChange={(e) => updateClass(idx, 'name', e.target.value)}
-                                            />
-                                            <select 
-                                                className={`border rounded p-2 text-sm w-24 cursor-pointer font-medium ${COLOR_PALETTE[cls.color]?.text} ${COLOR_PALETTE[cls.color]?.bgLight}`}
-                                                value={cls.color}
-                                                onChange={(e) => updateClass(idx, 'color', e.target.value)}
-                                            >
-                                                {Object.keys(COLOR_PALETTE).map(key => (
-                                                    <option key={key} value={key}>
-                                                        {COLOR_PALETTE[key].label}
-                                                    </option>
-                                                ))}
-                                            </select>
-                                            <button 
-                                                onClick={() => removeClass(idx)}
-                                                className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded"
-                                            >
-                                                <Icons.Trash />
-                                            </button>
-                                        </div>
-                                    ))}
-                                </div>
+                                <label className="block text-sm font-bold mb-1">担任名</label>
+                                <input type="text" className="w-full border p-2 rounded" value={lTitle || ''} onChange={e => setLTitle(e.target.value)} />
                             </div>
-                        </div>
-
-                        <div className="flex justify-end gap-2 mt-4 pt-4 border-t flex-shrink-0">
-                            <button onClick={onClose} className="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300 transition">キャンセル</button>
-                            <button onClick={handleSave} className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 shadow font-bold transition">保存</button>
-                        </div>
-                    </div>
-                </div>
-            );
-        };
-
-        const ClassHistoryView = ({ data, classes }) => {
-            const [selectedClass, setSelectedClass] = useState(classes[0]?.name || '1A');
-            const [searchTerm, setSearchTerm] = useState("");
-
-            const history = useMemo(() => {
-                const list = [];
-                Object.keys(data).sort().reverse().forEach(dateKey => {
-                    const dayData = data[dateKey];
-                    Object.keys(dayData).forEach(slotId => {
-                        const slot = dayData[slotId];
-                        // Filter logic
-                        const matchesClass = selectedClass === 'ALL' || slot.classId === selectedClass;
-                        const matchesSearch = searchTerm === "" || 
-                                              (slot.plan && slot.plan.includes(searchTerm)) || 
-                                              (slot.actual && slot.actual.includes(searchTerm));
-
-                        if (matchesClass && matchesSearch && (slot.plan || slot.actual)) {
-                            list.push({
-                                date: dateKey,
-                                period: TIME_SLOTS.find(t => t.id === slotId)?.label || slotId,
-                                plan: slot.plan,
-                                actual: slot.actual,
-                                classId: slot.classId
-                            });
-                        }
-                    });
-                });
-                return list;
-            }, [data, selectedClass, searchTerm]);
-
-            return (
-                <div className="bg-white rounded shadow p-4 h-full overflow-hidden flex flex-col">
-                    <div className="flex flex-col md:flex-row justify-between items-center mb-4 border-b pb-4 gap-4">
-                        <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
-                            <Icons.List /> 
-                            指導記録検索
-                        </h2>
-                        <div className="flex gap-2 w-full md:w-auto">
-                            <div className="relative flex-1">
-                                <Icons.Search className="absolute left-2 top-2.5 text-gray-400" size={16} />
-                                <input 
-                                    type="text" 
-                                    placeholder="キーワード検索..." 
-                                    className="pl-8 border p-2 rounded shadow-sm w-full"
-                                    value={searchTerm}
-                                    onChange={(e) => setSearchTerm(e.target.value)}
-                                />
+                            <div className="bg-blue-50 p-4 rounded-lg border border-blue-100 space-y-3">
+                                <h3 className="font-bold text-blue-800 flex items-center gap-1"><Icons.Cloud size={16}/> クラウド同期</h3>
+                                <div className="flex items-center gap-2"><label className="w-16 text-xs">App ID:</label><input className="flex-1 border p-1 rounded font-mono text-sm" value={lAppId || ''} onChange={e=>setLAppId(e.target.value)}/></div>
+                                <div className="flex items-center gap-2"><label className="w-16 text-xs">Sync ID:</label><input className="flex-1 border p-1 rounded font-mono text-sm font-bold" value={lSyncId || ''} onChange={e=>setLSyncId(e.target.value)}/></div>
+                                <button onClick={() => onTriggerSync(lSyncId, lAppId)} disabled={isSyncing} className="w-full bg-green-600 text-white font-bold py-2 rounded flex justify-center items-center gap-1 hover:bg-green-700 disabled:bg-gray-400"><Icons.Wifi size={16}/>同期</button>
                             </div>
-                            <select 
-                                value={selectedClass} 
-                                onChange={(e) => setSelectedClass(e.target.value)}
-                                className="border p-2 rounded shadow-sm"
-                            >
-                                <option value="ALL">全クラス</option>
-                                {classes.map((c, idx) => <option key={idx} value={c.name}>{c.name}</option>)}
-                            </select>
-                        </div>
-                    </div>
-                    
-                    <div className="flex-1 overflow-auto custom-scrollbar">
-                        {history.length === 0 ? (
-                            <div className="text-center text-gray-400 py-10">履歴がありません</div>
-                        ) : (
-                            <table className="w-full text-left border-collapse">
-                                <thead className="bg-gray-100 sticky top-0">
-                                    <tr>
-                                        <th className="p-3 border-b font-medium w-32">日付・時限</th>
-                                        {selectedClass === 'ALL' && <th className="p-3 border-b font-medium w-24">クラス</th>}
-                                        <th className="p-3 border-b font-medium">予定 (Plan)</th>
-                                        <th className="p-3 border-b font-medium">実施記録 (Actual)</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {history.map((item, idx) => (
-                                        <tr key={idx} className="hover:bg-gray-50 border-b">
-                                            <td className="p-3 text-sm text-gray-600">
-                                                {item.date} <br/>
-                                                <span className="text-xs bg-gray-200 px-1 rounded">{item.period}</span>
-                                            </td>
-                                            {selectedClass === 'ALL' && (
-                                                <td className="p-3 text-sm font-bold text-gray-600">{item.classId}</td>
-                                            )}
-                                            <td className="p-3 text-sm whitespace-pre-wrap">{item.plan}</td>
-                                            <td className="p-3 text-sm whitespace-pre-wrap text-blue-800">{item.actual}</td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        )}
-                    </div>
-                </div>
-            );
-        };
-
-        const StatsView = ({ data, classes, currentDate }) => {
-            const [filterType, setFilterType] = useState('all'); // 'all', 'month', 'week'
-
-            const counts = useMemo(() => {
-                const c = {};
-                classes.forEach(cls => c[cls.name] = 0);
-                
-                // 期間計算用
-                const year = currentDate.getFullYear();
-                const month = currentDate.getMonth(); // 0-11
-                
-                // 週の計算（月曜始まり）
-                const currentMonday = new Date(currentDate);
-                const day = currentMonday.getDay();
-                const diff = currentMonday.getDate() - day + (day === 0 ? -6 : 1);
-                currentMonday.setDate(diff);
-                const currentSunday = new Date(currentMonday);
-                currentSunday.setDate(currentMonday.getDate() + 6);
-
-                // 日付比較用のヘルパー
-                const isSameMonth = (d) => d.getFullYear() === year && d.getMonth() === month;
-                const isSameWeek = (d) => {
-                     // 時間をリセットして比較
-                     const target = new Date(d);
-                     target.setHours(0,0,0,0);
-                     const start = new Date(currentMonday);
-                     start.setHours(0,0,0,0);
-                     const end = new Date(currentSunday);
-                     end.setHours(23,59,59,999);
-                     return target >= start && target <= end;
-                };
-                
-                Object.entries(data).forEach(([dateKey, dayData]) => {
-                    const date = new Date(dateKey);
-                    if (isNaN(date.getTime())) return; // 不正な日付キーはスキップ
-
-                    // フィルタリング
-                    if (filterType === 'month' && !isSameMonth(date)) return;
-                    if (filterType === 'week' && !isSameWeek(date)) return;
-
-                    Object.entries(dayData).forEach(([slotId, slotData]) => {
-                        if (['1','2','3','4','5','6','7'].includes(slotId) && slotData.classId) {
-                            if (c[slotData.classId] === undefined) c[slotData.classId] = 0;
-                            c[slotData.classId]++;
-                        }
-                    });
-                });
-                return c;
-            }, [data, classes, filterType, currentDate]);
-
-            const maxCount = Math.max(...Object.values(counts), 1);
-            
-            const getFilterLabel = () => {
-                if (filterType === 'all') return '全期間';
-                if (filterType === 'month') return `${currentDate.getMonth() + 1}月分`;
-                if (filterType === 'week') return '今週分';
-                return '';
-            };
-
-            return (
-                <div className="bg-white rounded shadow p-6 h-full overflow-hidden flex flex-col">
-                    <div className="flex flex-col md:flex-row justify-between items-center mb-6 border-b pb-2 gap-4">
-                        <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
-                            <Icons.BarChart /> 授業数集計
-                        </h2>
-                        
-                        <div className="flex bg-gray-100 p-1 rounded-lg">
-                             <button 
-                                onClick={() => setFilterType('all')}
-                                className={`px-3 py-1 text-xs font-bold rounded-md transition ${filterType === 'all' ? 'bg-white shadow text-blue-600' : 'text-gray-500 hover:text-gray-700'}`}
-                            >
-                                全期間
-                            </button>
-                            <button 
-                                onClick={() => setFilterType('month')}
-                                className={`px-3 py-1 text-xs font-bold rounded-md transition ${filterType === 'month' ? 'bg-white shadow text-blue-600' : 'text-gray-500 hover:text-gray-700'}`}
-                            >
-                                今月のみ
-                            </button>
-                            <button 
-                                onClick={() => setFilterType('week')}
-                                className={`px-3 py-1 text-xs font-bold rounded-md transition ${filterType === 'week' ? 'bg-white shadow text-blue-600' : 'text-gray-500 hover:text-gray-700'}`}
-                            >
-                                今週のみ
-                            </button>
-                        </div>
-                    </div>
-                    
-                    <div className="mb-2 text-right text-xs text-gray-500 font-bold">
-                        対象期間: <span className="text-blue-600 text-sm">{getFilterLabel()}</span>
-                    </div>
-
-                    <div className="flex-1 overflow-auto custom-scrollbar">
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                            {classes.map((cls, idx) => {
-                                const count = counts[cls.name] || 0;
-                                const percentage = (count / maxCount) * 100;
-                                const colorTheme = COLOR_PALETTE[cls.color || 'gray'];
-
-                                return (
-                                    <div key={idx} className="border rounded p-4 flex items-center justify-between shadow-sm bg-gray-50">
-                                        <div className="flex-1">
-                                            <div className="flex justify-between items-baseline mb-2">
-                                                <span className={`font-bold text-lg ${colorTheme.text}`}>{cls.name}</span>
-                                                <span className="text-2xl font-bold text-gray-900">{count} <span className="text-xs font-normal text-gray-500">コマ</span></span>
-                                            </div>
-                                            <div className="w-full bg-gray-200 rounded-full h-2.5">
-                                                <div className={`${colorTheme.bg} h-2.5 rounded-full`} style={{ width: `${percentage}%`, minWidth: '5%' }}></div>
-                                            </div>
-                                        </div>
+                            <div className="bg-gray-100 p-4 rounded-lg border border-gray-200 space-y-2">
+                                <h3 className="font-bold text-gray-700 flex items-center gap-1"><Icons.Database size={16}/> Firebase</h3>
+                                <textarea className="w-full border rounded p-2 text-xs font-mono h-16" placeholder="const config = {...}" value={configIn} onChange={e=>setConfigIn(e.target.value)} />
+                                <button onClick={parseConfig} className="w-full bg-gray-600 text-white text-xs py-1 rounded">更新してリロード</button>
+                            </div>
+                            <div className="space-y-2">
+                                <div className="flex justify-between items-center"><label className="font-bold text-sm">クラス設定</label><button onClick={() => setLClasses([...lClasses, {name:'', color:'gray'}])} className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded font-bold">+ 追加</button></div>
+                                {lClasses.map((c, i) => (
+                                    <div key={i} className="flex gap-2">
+                                        <input className="border p-1 rounded flex-1" value={c.name} onChange={e => { const nc=[...lClasses]; nc[i].name=e.target.value; setLClasses(nc); }} />
+                                        <select className={"border p-1 rounded w-20 " + (COLOR_PALETTE[c.color]?.bgLight || "")} value={c.color} onChange={e => { const nc=[...lClasses]; nc[i].color=e.target.value; setLClasses(nc); }}>
+                                            {Object.keys(COLOR_PALETTE).map(k => <option key={k} value={k}>{COLOR_PALETTE[k].label}</option>)}
+                                        </select>
+                                        <button onClick={() => setLClasses(lClasses.filter((_,idx)=>idx!==i))} className="text-gray-400 hover:text-red-500"><Icons.Trash/></button>
                                     </div>
-                                );
-                            })}
+                                ))}
+                            </div>
+                        </div>
+                        <div className="flex justify-end gap-2 mt-4 pt-4 border-t shrink-0">
+                            <button onClick={onClose} className="px-4 py-2 bg-gray-200 rounded font-bold">キャンセル</button>
+                            <button onClick={handleSave} className="px-4 py-2 bg-blue-600 text-white rounded font-bold">保存</button>
                         </div>
                     </div>
                 </div>
             );
         };
 
-        const MonthView = ({ currentDate, data, onNavigateToWeek, classList }) => {
-            const year = currentDate.getFullYear();
-            const month = currentDate.getMonth();
-            const firstDay = new Date(year, month, 1);
-            const startingDay = firstDay.getDay(); 
-            const diff = startingDay === 0 ? 6 : startingDay - 1;
-            const daysInMonth = new Date(year, month + 1, 0).getDate();
-            
+        const MonthView = ({ date, data, onNav, classes }) => {
+            const y = date.getFullYear(), m = date.getMonth();
+            const first = new Date(y, m, 1).getDay();
+            const diff = first === 0 ? 6 : first - 1;
+            const days = new Date(y, m + 1, 0).getDate();
             const grid = [];
-            let dayCounter = 1;
+            let dCount = 1;
+            
             for (let i = 0; i < 6; i++) {
                 const row = [];
                 for (let j = 0; j < 7; j++) {
-                    if (i === 0 && j < diff) {
-                        row.push(null);
-                    } else if (dayCounter > daysInMonth) {
-                        row.push(null);
-                    } else {
-                        row.push(new Date(year, month, dayCounter));
-                        dayCounter++;
-                    }
+                    if (i === 0 && j < diff) row.push(null);
+                    else if (dCount > days) row.push(null);
+                    else { row.push(new Date(y, m, dCount)); dCount++; }
                 }
                 grid.push(row);
-                if (dayCounter > daysInMonth) break;
+                if (dCount > days) break;
             }
 
-            const getClassColorStyle = (clsName) => {
-                const clsObj = classList.find(c => c.name === clsName);
-                const theme = COLOR_PALETTE[clsObj ? clsObj.color : (guessColor(clsName) || 'gray')];
-                return `${theme.bgLight} ${theme.text}`;
-            };
-
-            const periodMap = {
-                '1': '①', '2': '②', '3': '③', '4': '④', '5': '⑤', '6': '⑥', '7': '⑦'
-            };
-
             return (
-                <div className="h-full flex flex-col p-4 overflow-hidden">
+                <div className="h-full p-4 overflow-hidden flex flex-col">
                     <div className="bg-white rounded-lg shadow border flex-1 flex flex-col">
                         <div className="grid grid-cols-7 border-b bg-gray-50">
                             {WEEK_DAYS.concat(['日']).map((d, i) => (
-                                <div key={i} className={`p-2 text-center text-sm font-bold ${i === 6 ? 'text-red-500' : 'text-gray-600'}`}>
-                                    {d}
-                                </div>
+                                <div key={i} className={"p-2 text-center text-sm font-bold " + (i===6?"text-red-500":"text-gray-600")}>{d}</div>
                             ))}
                         </div>
                         <div className="flex-1 grid grid-rows-5 sm:grid-rows-6">
-                            {grid.map((row, rIdx) => (
-                                <div key={rIdx} className="grid grid-cols-7 h-full">
-                                    {row.map((date, cIdx) => {
-                                        if (!date) return <div key={cIdx} className="bg-gray-50/50 border-r border-b"></div>;
-                                        
-                                        const dateKey = formatDateKey(date);
-                                        const dayData = data[dateKey] || {};
-                                        const isToday = formatDateKey(new Date()) === dateKey;
-
-                                        const dayClasses = [];
-                                        ['1','2','3','4','5','6','7'].forEach(pid => {
-                                            const slot = dayData[pid];
-                                            if (slot && slot.classId) {
-                                                dayClasses.push({ pid, classId: slot.classId });
-                                            }
-                                        });
+                            {grid.map((row, r) => (
+                                <div key={r} className="grid grid-cols-7">
+                                    {row.map((dt, c) => {
+                                        if (!dt) return <div key={c} className="bg-gray-50/50 border-r border-b"></div>;
+                                        const dk = formatDateKey(dt);
+                                        const dData = data[dk] || {};
+                                        const isToday = formatDateKey(new Date()) === dk;
+                                        const dcs = [];
+                                        ['1','2','3','4','5','6','7'].forEach(p => { if (dData[p]?.classId) dcs.push({p, id: dData[p].classId}); });
 
                                         return (
-                                            <div 
-                                                key={cIdx} 
-                                                onClick={() => onNavigateToWeek(date)}
-                                                className={`
-                                                    border-r border-b p-1 relative hover:bg-blue-50 cursor-pointer transition flex flex-col
-                                                    ${isToday ? 'bg-blue-50' : ''}
-                                                `}
-                                            >
-                                                <div className="flex justify-between items-start mb-1">
-                                                    <span className={`text-sm font-bold w-6 h-6 flex items-center justify-center rounded-full ${isToday ? 'bg-blue-600 text-white' : ''}`}>
-                                                        {date.getDate()}
-                                                    </span>
-                                                </div>
-                                                <div className="flex-1 overflow-hidden flex flex-wrap content-start gap-1">
-                                                    {dayClasses.map((item, idx) => (
-                                                        <span key={idx} className={`text-[10px] font-bold px-1 rounded flex items-center ${getClassColorStyle(item.classId)}`}>
-                                                            <span className="mr-0.5 opacity-70">{periodMap[item.pid]}</span>
-                                                            {item.classId}
-                                                        </span>
-                                                    ))}
+                                            <div key={c} onClick={() => onNav(dt)} className={"border-r border-b p-1 cursor-pointer hover:bg-blue-50 flex flex-col " + (isToday ? "bg-blue-50" : "")}>
+                                                <div className="mb-1"><span className={"text-sm font-bold w-6 h-6 flex items-center justify-center rounded-full " + (isToday ? "bg-blue-600 text-white" : "")}>{dt.getDate()}</span></div>
+                                                <div className="flex-1 flex flex-wrap gap-1 content-start overflow-hidden">
+                                                    {dcs.map((x, i) => {
+                                                        const co = classes.find(cl => cl.name === x.id);
+                                                        const th = COLOR_PALETTE[co ? co.color : guessColor(x.id)];
+                                                        return <span key={i} className={"text-[10px] font-bold px-1 rounded flex items-center " + th.bgLight + " " + th.text}><span className="opacity-70 mr-0.5">{x.p}</span>{x.id}</span>;
+                                                    })}
                                                 </div>
                                             </div>
                                         );
@@ -866,584 +354,342 @@
                     </div>
                 </div>
             );
-        }
+        };
+
+        const ClassHistoryView = ({ data, classes }) => {
+            const [selCls, setSelCls] = useState('ALL');
+            const [search, setSearch] = useState("");
+            
+            const history = useMemo(() => {
+                const list = [];
+                Object.keys(data).sort().reverse().forEach(dk => {
+                    Object.keys(data[dk] || {}).forEach(sid => {
+                        const s = data[dk][sid];
+                        if (!s || (!s.plan && !s.actual)) return;
+                        if (selCls !== 'ALL' && s.classId !== selCls) return;
+                        if (search && !((s.plan||'').includes(search) || (s.actual||'').includes(search))) return;
+                        list.push({ date: dk, period: TIME_SLOTS.find(t=>t.id===sid)?.label||sid, plan: s.plan, actual: s.actual, classId: s.classId });
+                    });
+                });
+                return list;
+            }, [data, selCls, search]);
+
+            return (
+                <div className="bg-white rounded shadow p-4 h-full flex flex-col">
+                    <div className="flex justify-between items-center mb-4 border-b pb-4 gap-4">
+                        <h2 className="text-xl font-bold flex items-center gap-2"><Icons.List />記録検索</h2>
+                        <div className="flex gap-2">
+                            <div className="relative">
+                                <Icons.Search className="absolute left-2 top-2.5 text-gray-400" />
+                                <input type="text" className="pl-8 border p-2 rounded" placeholder="検索..." value={search} onChange={e=>setSearch(e.target.value)} />
+                            </div>
+                            <select className="border p-2 rounded" value={selCls} onChange={e=>setSelCls(e.target.value)}>
+                                <option value="ALL">全クラス</option>
+                                {classes.map((c,i) => <option key={i} value={c.name}>{c.name}</option>)}
+                            </select>
+                        </div>
+                    </div>
+                    <div className="flex-1 overflow-auto custom-scrollbar">
+                        <table className="w-full text-left border-collapse text-sm">
+                            <thead className="bg-gray-100 sticky top-0"><tr><th className="p-3 border-b">日付</th><th className="p-3 border-b text-center">クラス</th><th className="p-3 border-b">内容</th><th className="p-3 border-b">実施記録</th></tr></thead>
+                            <tbody>
+                                {history.map((h, i) => (
+                                    <tr key={i} className="border-b hover:bg-gray-50">
+                                        <td className="p-3 text-gray-600">{h.date}<br/><span className="text-xs bg-gray-200 px-1 rounded">{h.period}</span></td>
+                                        <td className="p-3 font-bold text-center">{h.classId}</td>
+                                        <td className="p-3 whitespace-pre-wrap">{h.plan}</td>
+                                        <td className="p-3 whitespace-pre-wrap text-blue-800 font-medium">{h.actual}</td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            );
+        };
+
+        const StatsView = ({ data, classes, date }) => {
+            const [filter, setFilter] = useState('all');
+            const counts = useMemo(() => {
+                const c = {}; classes.forEach(i => c[i.name] = 0);
+                const st = new Date(date), day = st.getDay(), df = st.getDate() - day + (day===0?-6:1);
+                const mon = new Date(st.setDate(df)); mon.setHours(0,0,0,0);
+                const sun = new Date(mon); sun.setDate(mon.getDate()+6); sun.setHours(23,59,59,999);
+                
+                Object.entries(data).forEach(([dk, dd]) => {
+                    const d = new Date(dk); if(isNaN(d.getTime())) return;
+                    if(filter==='month' && (d.getMonth()!==date.getMonth() || d.getFullYear()!==date.getFullYear())) return;
+                    if(filter==='week' && (d<mon || d>sun)) return;
+                    Object.entries(dd || {}).forEach(([sid, s]) => { if(['1','2','3','4','5','6','7'].includes(sid) && s && s.classId) c[s.classId] = (c[s.classId]||0)+1; });
+                });
+                return c;
+            }, [data, classes, filter, date]);
+
+            const max = Math.max(...Object.values(counts), 1);
+
+            return (
+                <div className="bg-white rounded shadow p-6 h-full flex flex-col">
+                    <div className="flex justify-between items-center mb-6 border-b pb-2">
+                        <h2 className="text-xl font-bold flex items-center gap-2"><Icons.BarChart />授業集計</h2>
+                        <div className="flex bg-gray-100 p-1 rounded-lg">
+                            {['all','month','week'].map(f => (
+                                <button key={f} onClick={()=>setFilter(f)} className={"px-3 py-1 text-xs font-bold rounded " + (filter===f?"bg-white shadow text-blue-600":"text-gray-500 hover:text-gray-700")}>{f==='all'?'全期間':f==='month'?'今月':'今週'}</button>
+                            ))}
+                        </div>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 overflow-auto custom-scrollbar content-start">
+                        {classes.map((cls, i) => {
+                            const ct = counts[cls.name]||0;
+                            const th = COLOR_PALETTE[cls.color]||COLOR_PALETTE.gray;
+                            return (
+                                <div key={i} className="border rounded p-4 bg-gray-50">
+                                    <div className="flex justify-between items-baseline mb-2"><span className={"font-bold " + th.text}>{cls.name}</span><span className="text-xl font-bold">{ct} <span className="text-xs text-gray-500">コマ</span></span></div>
+                                    <div className="w-full bg-gray-200 rounded-full h-2"><div className={th.bg + " h-2 rounded-full"} style={{width: (ct/max*100)+'%', minWidth:'5%'}}></div></div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                </div>
+            );
+        };
+
+        // --- Main App ---
 
         const App = () => {
-            const [currentDate, setCurrentDate] = useState(new Date()); 
-            const [viewMode, setViewMode] = useState('week'); 
-            const [scheduleData, setScheduleData] = useState({}); 
-            const [classList, setClassList] = useState(DEFAULT_CLASSES);
-            const [teacherTitle, setTeacherTitle] = useState("1年A組 担任");
-            
-            // Sync State
-            const [syncId, setSyncId] = useState(() => {
-                const saved = localStorage.getItem('teacherLogSyncId');
-                return saved || generateId();
-            });
+            const [date, setDate] = useState(new Date()); 
+            const [view, setView] = useState('week'); 
+            const [data, setData] = useState({}); 
+            const [classes, setClasses] = useState(DEFAULT_CLASSES);
+            const [title, setTitle] = useState("担任");
+            const [appId, setAppId] = useState(initialAppId);
+            const [syncId, setSyncId] = useState(() => localStorage.getItem('teacherLogSyncId') || generateId());
             const [isSyncing, setIsSyncing] = useState(false);
             const [isCloudLoaded, setIsCloudLoaded] = useState(false);
-
-            const [slotModalInfo, setSlotModalInfo] = useState({ isOpen: false, date: null, slotId: null });
+            const [modal, setModal] = useState({ isOpen: false, date: null, slotId: null });
             const [isSettingsOpen, setSettingsOpen] = useState(false);
+            const [user, setUser] = useState(null);
 
-            // --- Persistence & Sync Logic ---
-
+            // ローカルデータの安全な読み込み
             useEffect(() => {
-                const savedData = localStorage.getItem('teachersLogData');
-                if (savedData) setScheduleData(JSON.parse(savedData));
-                
-                const savedClasses = localStorage.getItem('teachersLogClasses');
-                if (savedClasses) {
-                    const parsed = JSON.parse(savedClasses);
-                    if (parsed.length > 0 && typeof parsed[0] === 'string') {
-                        const migrated = parsed.map(c => ({ name: c, color: guessColor(c) }));
-                        setClassList(migrated);
-                    } else {
-                        setClassList(parsed);
-                    }
-                }
+                const loadSafe = (key, defaultVal, isArray) => {
+                    const str = localStorage.getItem(key);
+                    if (!str) return defaultVal;
+                    try {
+                        const parsed = JSON.parse(str);
+                        if (isArray && Array.isArray(parsed)) return parsed;
+                        if (!isArray && parsed && typeof parsed === 'object') return parsed;
+                    } catch(e) {}
+                    return defaultVal;
+                };
 
-                const savedTitle = localStorage.getItem('teacherLogTitle');
-                if (savedTitle) setTeacherTitle(savedTitle);
+                setData(loadSafe('teachersLogData', {}, false));
+                setClasses(loadSafe('teachersLogClasses', DEFAULT_CLASSES, true));
+                const sTit = localStorage.getItem('teacherLogTitle');
+                if (sTit) setTitle(sTit);
             }, []);
 
-            // Real-time Sync Logic (Replaces manual fetch)
+            // 認証の安定化
             useEffect(() => {
-                if (!useCloud || !auth || !db) return;
-
-                let unsubscribe = () => {};
-
-                const setupRealtimeListener = async () => {
-                    // Auth check (ensure signed in)
-                    if (!auth.currentUser) {
-                         if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                            await auth.signInWithCustomToken(__initial_auth_token);
-                         } else {
-                            await auth.signInAnonymously();
-                         }
-                    }
-
-                    const docRef = db.collection('artifacts').doc(appId).collection('public').doc('data').collection('weekly_plans').doc(syncId);
-                    
-                    unsubscribe = docRef.onSnapshot((doc) => {
-                        // ignore local writes to prevent loops/jitters
-                        if (doc.metadata.hasPendingWrites) return; 
-
-                        if (doc.exists) {
-                            const remoteData = doc.data();
-                            // console.log("Realtime update received"); // debug
-                            
-                            // Merge logic: Update state from remote
-                            if (remoteData.schedule) setScheduleData(remoteData.schedule);
-                            if (remoteData.classes) {
-                                const rClasses = remoteData.classes;
-                                if (rClasses.length > 0 && typeof rClasses[0] === 'string') {
-                                    setClassList(rClasses.map(c => ({ name: c, color: guessColor(c) })));
-                                } else {
-                                    setClassList(rClasses);
-                                }
-                            }
-                            if (remoteData.title) setTeacherTitle(remoteData.title);
-                            
-                            setIsCloudLoaded(true); // Mark as safe to write
-                        } else {
-                            // Doc doesn't exist yet on cloud.
-                            // Only mark loaded if we are sure we connected.
-                            setIsCloudLoaded(true); 
-                        }
-                    }, (error) => {
-                        console.error("Sync error:", error);
-                    });
-                };
-
-                setupRealtimeListener();
-
-                return () => unsubscribe();
-            }, [syncId, useCloud]); 
-
-            // Save to Firestore on Change
-            // ★ UPDATED: Now returns a boolean promise indicating success
-            const saveToCloud = useCallback(async (newSchedule, newClasses, newTitle) => {
-                if (!useCloud || !auth) {
-                    // alert("クラウド機能が無効です。Firebase設定を確認してください。");
-                    return false;
-                }
-                
-                // Ensure auth
-                if (!auth.currentUser) {
+                if (!useCloud || !auth) return;
+                const initAuth = async () => {
                     try {
-                        await auth.signInAnonymously();
-                    } catch (e) {
-                        console.error("Auth failed:", e);
-                        alert(`クラウド認証に失敗しました。\nエラー詳細: ${e.message}\n\nFirebaseコンソールのAuthenticationで「匿名」が有効か、APIキーが正しいか確認してください。`);
-                        return false;
-                    }
-                }
-                
-                try {
-                    const docRef = db.collection('artifacts').doc(appId).collection('public').doc('data').collection('weekly_plans').doc(syncId);
-                    
-                    await docRef.set({
-                        schedule: newSchedule,
-                        classes: newClasses,
-                        title: newTitle,
-                        lastUpdated: new Date().toISOString()
-                    }, { merge: true });
-                    return true;
-                } catch (e) {
-                    console.error("Cloud save failed:", e);
-                    alert(`クラウド保存に失敗しました。\nエラー詳細: ${e.message}\n\nFirestoreの「ルール」タブで、書き込みが許可(allow write: if true)されているか確認してください。`);
-                    return false;
-                }
-            }, [syncId, useCloud]); // Removed isCloudLoaded guard for manual saves
-
-            // Manual Fetch / Connect (Smart Logic)
-            const fetchFromCloud = useCallback(async (targetId = syncId) => {
-                if (!useCloud || !auth || !db) return;
-                setIsSyncing(true);
-                try {
-                     const docRef = db.collection('artifacts').doc(appId).collection('public').doc('data').collection('weekly_plans').doc(targetId);
-                     const doc = await docRef.get();
-                     
-                     if (doc.exists) {
-                         // Data found on cloud
-                         const remoteData = doc.data();
-                         if (window.confirm("【データ受信】\nクラウドに保存されたデータが見つかりました。\n\nクラウドのデータをダウンロードして、表示を上書きしますか？\n（※iPadなど2台目以降の場合は「OK」を押してください）")) {
-                             if (remoteData.schedule) setScheduleData(remoteData.schedule);
-                             if (remoteData.classes) setClassList(remoteData.classes);
-                             if (remoteData.title) setTeacherTitle(remoteData.title);
-                             alert("クラウドのデータを取り込みました。");
-                         }
-                         setIsCloudLoaded(true);
-                     } else {
-                         // Data NOT found on cloud
-                         if (window.confirm("【新規作成】\nクラウドにデータがありませんでした。\n\n現在表示されているデータをクラウドに登録して、この端末を「親」として同期を開始しますか？")) {
-                             await saveToCloud(scheduleData, classList, teacherTitle);
-                             alert("アップロードしました。\nこれで他の端末からも同じIDでアクセスできます。");
-                         }
-                         setIsCloudLoaded(true);
-                     }
-                } catch(e) { 
-                    console.error(e);
-                    alert(`接続エラーが発生しました。\nエラー詳細: ${e.message}`);
-                }
-                finally { setIsSyncing(false); }
-            }, [syncId, useCloud, scheduleData, classList, teacherTitle, saveToCloud]); 
-
-            useEffect(() => {
-                localStorage.setItem('teachersLogData', JSON.stringify(scheduleData));
-            }, [scheduleData]);
-            
-            useEffect(() => {
-                localStorage.setItem('teachersLogClasses', JSON.stringify(classList));
-            }, [classList]);
-            
-            useEffect(() => {
-                localStorage.setItem('teacherLogSyncId', syncId);
-            }, [syncId]);
-
-            useEffect(() => {
-                localStorage.setItem('teacherLogTitle', teacherTitle);
-            }, [teacherTitle]);
-
-            const currentMonday = getMonday(currentDate);
-            const displayMonth = currentMonday.getMonth() + 1;
-            const weekNumber = Math.ceil(currentMonday.getDate() / 7); 
-
-            const weekDates = WEEK_DAYS.map((_, i) => {
-                const d = new Date(currentMonday);
-                d.setDate(currentMonday.getDate() + i);
-                return d;
-            });
-
-            const navigateWeek = (direction) => {
-                const newDate = new Date(currentMonday);
-                newDate.setDate(currentMonday.getDate() + (direction * 7));
-                setCurrentDate(newDate);
-            };
-            
-            const navigateMonth = (direction) => {
-                const newDate = new Date(currentDate);
-                newDate.setMonth(currentDate.getMonth() + direction);
-                setCurrentDate(newDate);
-            };
-
-            const navigateToToday = () => {
-                const now = new Date();
-                setCurrentDate(now);
-                if (viewMode === 'month') {
-                    // Stay in month
-                } else {
-                    setViewMode('week');
-                }
-            };
-
-            const handleSlotClick = (date, slotId) => {
-                setSlotModalInfo({
-                    isOpen: true,
-                    date: formatDateKey(date),
-                    slotId: slotId
-                });
-            };
-
-            const handleSaveSlot = (dateKey, slotId, newData) => {
-                setIsCloudLoaded(true); 
-
-                const updatedSchedule = {
-                    ...scheduleData,
-                    [dateKey]: {
-                        ...(scheduleData[dateKey] || {}),
-                        [slotId]: newData
-                    }
+                        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                            await auth.signInWithCustomToken(__initial_auth_token);
+                        } else {
+                            await auth.signInAnonymously();
+                        }
+                    } catch (e) { console.error("Auth error", e); }
                 };
-                setScheduleData(updatedSchedule);
-                // Auto-save logic: try to save, but don't alert on failure to avoid annoyance during quick edits
-                if (isCloudLoaded) {
-                    saveToCloud(updatedSchedule, classList, teacherTitle);
-                }
-            };
+                initAuth();
+                const unsub = auth.onAuthStateChanged(u => setUser(u));
+                return () => unsub();
+            }, []);
 
-            const handleUpdateClasses = (newClasses) => {
-                setIsCloudLoaded(true);
-                setClassList(newClasses);
-                if (isCloudLoaded) {
-                    saveToCloud(scheduleData, newClasses, teacherTitle);
-                }
-            };
-            
-            const handleUpdateTeacherTitle = (newTitle) => {
-                setIsCloudLoaded(true);
-                setTeacherTitle(newTitle);
-                if (isCloudLoaded) {
-                    saveToCloud(scheduleData, classList, newTitle);
-                }
-            };
-
-            const handleNavigateFromMonth = (date) => {
-                setCurrentDate(date);
-                setViewMode('week');
-            };
-
-            const handlePrint = () => {
-                window.print();
-            };
-
-            const handleManualSave = async () => {
-                if (!window.confirm("現在のデータをクラウドに上書き保存しますか？")) return;
-                setIsSyncing(true);
-                const success = await saveToCloud(scheduleData, classList, teacherTitle);
-                setIsSyncing(false);
-                if (success) {
-                    alert("クラウドに保存しました。");
-                }
-            };
-
-            const handleManualLoad = async () => {
-                // Manual load uses the same logic as fetchFromCloud
-                await fetchFromCloud();
-            };
-
-            const exportData = () => {
-                const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify({
-                    schedule: scheduleData, 
-                    classes: classList,
-                    title: teacherTitle
-                }));
-                const downloadAnchorNode = document.createElement('a');
-                downloadAnchorNode.setAttribute("href", dataStr);
-                downloadAnchorNode.setAttribute("download", `weekly_plan_backup_${formatDateKey(new Date())}.json`);
-                document.body.appendChild(downloadAnchorNode);
-                downloadAnchorNode.click();
-                downloadAnchorNode.remove();
-            };
-
-            const importData = (event) => {
-                const fileReader = new FileReader();
-                fileReader.readAsText(event.target.files[0], "UTF-8");
-                fileReader.onload = e => {
-                    const parsed = JSON.parse(e.target.result);
-                    if(parsed.schedule) setScheduleData(parsed.schedule);
-                    if(parsed.classes) {
-                         const rClasses = parsed.classes;
-                         if (rClasses.length > 0 && typeof rClasses[0] === 'string') {
-                             setClassList(rClasses.map(c => ({ name: c, color: guessColor(c) })));
-                         } else {
-                             setClassList(rClasses);
-                         }
+            // クラウドデータの監視
+            useEffect(() => {
+                if (!useCloud || !db || !user) return;
+                const unsub = db.collection('artifacts').doc(appId).collection('public').doc('data').collection('weekly_plans').doc(syncId).onSnapshot(doc => {
+                    if (doc.metadata.hasPendingWrites) return;
+                    if (doc.exists) {
+                        const d = doc.data();
+                        if(d.schedule) setData(d.schedule); 
+                        if(d.classes && Array.isArray(d.classes)) setClasses(d.classes); 
+                        if(d.title) setTitle(d.title);
                     }
-                    if(parsed.title) setTeacherTitle(parsed.title);
-                    
                     setIsCloudLoaded(true);
-                    // Try auto save after import
-                    saveToCloud(parsed.schedule, parsed.classes, parsed.title || teacherTitle);
-                    alert("データを復元しました。");
-                };
+                }, err => {
+                    console.error("Firebase read error", err);
+                });
+                return () => unsub();
+            }, [user, syncId, appId]);
+
+            // 安全なクラウド保存
+            const saveCloud = useCallback(async (nd=data, nc=classes, nt=title) => {
+                if (!useCloud || !db || !user) return false;
+                try {
+                    await db.collection('artifacts').doc(appId).collection('public').doc('data').collection('weekly_plans').doc(syncId).set({ schedule: nd||{}, classes: nc||[], title: nt||"", updated: new Date().toISOString() }, { merge: true });
+                    return true;
+                } catch(e){ return false; }
+            }, [user, syncId, appId, data, classes, title]);
+
+            const triggerSync = async (tid, taid) => {
+                if (!useCloud || !db || !user) return;
+                setIsSyncing(true);
+                try {
+                    const doc = await db.collection('artifacts').doc(taid).collection('public').doc('data').collection('weekly_plans').doc(tid).get();
+                    if (doc.exists) {
+                        const d = doc.data();
+                        if (confirm("クラウドデータを上書きロードしますか？")) {
+                            if(d.schedule) setData(d.schedule); 
+                            if(d.classes && Array.isArray(d.classes)) setClasses(d.classes); 
+                            if(d.title) setTitle(d.title);
+                            alert("ロード完了");
+                        }
+                    } else {
+                        if (confirm("クラウドにデータなし。現在のデータを登録しますか？")) { 
+                            await saveCloud(); 
+                            alert("登録完了"); 
+                        }
+                    }
+                } catch(e) { alert("エラー: " + e.message); }
+                setIsSyncing(false);
             };
 
-            const SlotCell = ({ dateKey, slot, date }) => {
-                const dayData = scheduleData[dateKey] || {};
-                const slotData = dayData[slot.id] || {};
-                const text = slotData.plan || slotData.actual || '';
-                const isActual = !slotData.plan && slotData.actual; 
-                
-                const getBadgeStyle = (clsName) => {
-                    const clsObj = classList.find(c => c.name === clsName);
-                    if (!clsObj) {
-                         const guessed = guessColor(clsName);
-                         const theme = COLOR_PALETTE[guessed];
-                         return `${theme.bgLight} ${theme.text}`;
+            // ローカルストレージの保存
+            useEffect(() => { localStorage.setItem('teachersLogData', JSON.stringify(data)); }, [data]);
+            useEffect(() => { localStorage.setItem('teachersLogClasses', JSON.stringify(classes)); }, [classes]);
+            useEffect(() => { localStorage.setItem('teacherLogSyncId', syncId); localStorage.setItem('teacherLogAppId', appId); localStorage.setItem('teacherLogTitle', title); }, [syncId, appId, title]);
+
+            const mon = getMonday(date);
+            const wNum = Math.ceil(mon.getDate() / 7); 
+            const wDates = WEEK_DAYS.map((_, i) => { const d = new Date(mon); d.setDate(mon.getDate() + i); return d; });
+            
+            const handleSaveSlot = (dk, sid, nd) => {
+                const upd = { ...data, [dk]: { ...(data[dk]||{}), [sid]: nd } };
+                setData(upd); if (isCloudLoaded) saveCloud(upd, classes, title);
+            };
+
+            const downloadBackup = () => {
+                const a = document.createElement('a');
+                a.href = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify({ schedule: data, classes: classes, title: title }));
+                a.download = "backup_" + formatDateKey(new Date()) + ".json";
+                a.click();
+            };
+
+            const uploadBackup = (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+                const fr = new FileReader(); 
+                fr.readAsText(file, "UTF-8");
+                fr.onload = ex => {
+                    try {
+                        const p = JSON.parse(ex.target.result);
+                        if(p.schedule) setData(p.schedule); 
+                        if(p.classes && Array.isArray(p.classes)) setClasses(p.classes); 
+                        if(p.title) setTitle(p.title);
+                        if(isCloudLoaded) saveCloud(p.schedule, p.classes, p.title);
+                        alert("データを安全に復元しました。");
+                    } catch (error) {
+                        alert("復元に失敗しました。ファイルが壊れている可能性があります。");
                     }
-                    const theme = COLOR_PALETTE[clsObj.color || 'gray'];
-                    return `${theme.bgLight} ${theme.text}`;
                 };
+                // リセットして再度同じファイルを選べるようにする
+                e.target.value = '';
+            };
 
-                // 背景色の決定ロジック (v5.3 Updated)
-                let bgClass = 'bg-white';
-                if (slot.id === 'lunch') {
-                    bgClass = 'bg-gray-100 text-center flex items-center justify-center text-gray-400 print:text-black print:bg-gray-100';
-                } else if (slot.id === 'todo') {
-                    bgClass = 'bg-red-50'; // 薄いピンク
-                } else if (slot.id === 'collection') {
-                    bgClass = 'bg-blue-50'; // 薄いブルー
-                } else if (slot.id === 'morning') {
-                    bgClass = 'bg-yellow-50'; // 薄い黄色
-                } else if (['after', 'memo'].includes(slot.id)) {
-                    bgClass = 'bg-orange-50'; // 薄いオレンジ
-                }
-
+            const SlotCell = ({ dateKey, slot }) => {
+                const sd = (data[dateKey] || {})[slot.id] || {};
+                const co = classes.find(c => c.name === sd.classId);
+                const th = COLOR_PALETTE[co ? co.color : guessColor(sd.classId)];
+                
+                let bg = 'bg-white';
+                if (slot.id === 'lunch') bg = 'bg-gray-100 items-center justify-center text-gray-400';
+                else if (slot.id === 'todo') bg = 'bg-red-50'; else if (slot.id === 'collection') bg = 'bg-blue-50'; else if (slot.id === 'morning') bg = 'bg-yellow-50'; else if (['after','memo'].includes(slot.id)) bg = 'bg-orange-50';
+                
                 return (
-                    <div 
-                        className={`
-                            border-b border-r border-gray-200 p-1 text-xs relative cursor-pointer hover:bg-blue-50 transition-colors
-                            ${slot.height} overflow-hidden group
-                            ${bgClass}
-                            print-row
-                        `}
-                        onClick={() => handleSlotClick(date, slot.id)}
-                    >
-                        {slot.type === 'class' && slotData.classId && (
-                            <span className={`block font-bold mb-1 text-[10px] inline-block px-1.5 py-0.5 rounded ${getBadgeStyle(slotData.classId)} print:border print:border-black print:bg-white print:text-black`}>
-                                {slotData.classId}
-                            </span>
-                        )}
-                        
-                        <div className="whitespace-pre-wrap leading-tight text-gray-700 print:text-black">
-                            {isActual && <span className="text-orange-500 font-bold text-[10px] no-print">[実] </span>}
-                            {text}
-                        </div>
+                    <div className={"border-b border-r border-gray-200 p-1 text-xs relative cursor-pointer hover:bg-blue-50 transition-colors group print-row overflow-hidden flex flex-col " + slot.height + " " + bg} onClick={() => setModal({isOpen:true, date:dateKey, slotId:slot.id})}>
+                        {slot.type === 'class' && sd.classId && <span className={"font-bold mb-1 text-[10px] self-start px-1.5 py-0.5 rounded print-border " + th.bgLight + " " + th.text}>{sd.classId}</span>}
+                        <div className="whitespace-pre-wrap leading-tight text-gray-700">{(!sd.plan && sd.actual) && <span className="text-orange-500 font-bold">[実] </span>}{sd.plan || sd.actual || ''}</div>
                     </div>
                 );
             };
 
             return (
-                <div className="h-screen flex flex-col bg-gray-50 text-gray-800 print:bg-white print:h-auto">
-                    <header className="bg-white border-b shadow-sm px-4 py-3 flex items-center justify-between z-10 shrink-0 no-print">
-                        <div className="flex items-center gap-4">
-                            <div className="bg-blue-600 text-white p-2 rounded-lg shadow">
-                                <Icons.Calendar />
-                            </div>
+                <div className="h-screen flex flex-col print:h-auto">
+                    <header className="bg-white border-b px-4 py-3 flex justify-between items-center shrink-0 no-print">
+                        <div className="flex items-center gap-3">
+                            <div className="bg-blue-600 text-white p-2 rounded shadow"><Icons.Calendar /></div>
                             <div>
-                                <h1 className="text-xl font-bold leading-none hidden md:block flex items-center gap-2">
-                                    Teacher's Log Pro
-                                    <span className="text-xs font-normal text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded border">{APP_VERSION}</span>
-                                </h1>
-                                <p className="text-xs text-gray-500 font-medium mt-1 flex items-center gap-1">
-                                    {teacherTitle} 
-                                    {useCloud && (
-                                        <span className={`flex items-center gap-1 ml-2 ${isCloudLoaded ? 'text-green-500' : 'text-gray-400'}`}>
-                                            <Icons.Cloud size={10} /> {isCloudLoaded ? '同期OK' : '未接続'}
-                                        </span>
-                                    )}
-                                </p>
+                                <h1 className="text-xl font-bold leading-none hidden md:block">Teacher's Log Pro <span className="text-xs font-normal text-gray-400 bg-gray-100 px-1 border rounded">{APP_VERSION}</span></h1>
+                                <p className="text-xs text-gray-500 mt-1">{title} {useCloud && <span className={"ml-2 " + (isCloudLoaded ? "text-green-500":"text-gray-400")}>●</span>}</p>
                             </div>
                         </div>
-
                         <div className="flex bg-gray-100 p-1 rounded-lg">
-                            <button 
-                                onClick={() => setViewMode('month')}
-                                className={`px-4 py-1.5 rounded-md text-sm font-medium transition ${viewMode === 'month' ? 'bg-white shadow text-blue-600' : 'text-gray-500 hover:text-gray-700'}`}
-                            >
-                                月
-                            </button>
-                            <button 
-                                onClick={() => setViewMode('week')}
-                                className={`px-4 py-1.5 rounded-md text-sm font-medium transition ${viewMode === 'week' ? 'bg-white shadow text-blue-600' : 'text-gray-500 hover:text-gray-700'}`}
-                            >
-                                週
-                            </button>
-                            <button 
-                                onClick={() => setViewMode('history')}
-                                className={`px-4 py-1.5 rounded-md text-sm font-medium transition ${viewMode === 'history' ? 'bg-white shadow text-blue-600' : 'text-gray-500 hover:text-gray-700'}`}
-                            >
-                                履歴
-                            </button>
-                            <button 
-                                onClick={() => setViewMode('stats')}
-                                className={`px-4 py-1.5 rounded-md text-sm font-medium flex items-center gap-1 transition ${viewMode === 'stats' ? 'bg-white shadow text-blue-600' : 'text-gray-500 hover:text-gray-700'}`}
-                            >
-                                <Icons.BarChart /> 集計
-                            </button>
+                            {[{id:'month',l:'月'},{id:'week',l:'週'},{id:'history',l:'履歴'},{id:'stats',l:'集計'}].map(m => (
+                                <button key={m.id} onClick={()=>setView(m.id)} className={"px-4 py-1.5 text-sm font-bold rounded transition " + (view===m.id ? "bg-white shadow text-blue-600":"text-gray-500 hover:text-gray-800")}>{m.l}</button>
+                            ))}
                         </div>
-
-                        <div className="flex items-center gap-2 ml-4"> {/* Added ml-4 here */}
-                             {useCloud && (
-                                 <>
-                                     <button onClick={handleManualLoad} className="flex items-center gap-1 bg-gray-100 text-gray-700 px-3 py-1.5 rounded-lg border border-gray-300 hover:bg-gray-200 text-xs font-bold transition mr-1" title="クラウドから最新データを読み込む">
-                                         <Icons.RefreshCw size={14} /> 読込
-                                     </button>
-                                     <button onClick={handleManualSave} className="flex items-center gap-1 bg-blue-600 text-white px-3 py-1.5 rounded-lg hover:bg-blue-700 text-xs font-bold shadow-sm transition mr-2" title="クラウドへ保存する">
-                                         <Icons.Save size={14} /> 保存
-                                     </button>
-                                 </>
-                             )}
-                             
-                             <button onClick={handlePrint} className="p-2 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded" title="印刷">
-                                <Icons.Printer />
-                            </button>
-                             <label className="p-2 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded cursor-pointer">
-                                <Icons.Upload />
-                                <input type="file" onChange={importData} className="hidden" accept=".json"/>
-                            </label>
-                            <button onClick={exportData} className="p-2 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded">
-                                <Icons.Download />
-                            </button>
-                            <button onClick={() => setSettingsOpen(true)} className="p-2 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded relative">
-                                <Icons.Settings />
-                                {!isCloudLoaded && useCloud && (
-                                    <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
-                                )}
-                            </button>
+                        <div className="flex gap-1">
+                            <button onClick={()=>window.print()} className="p-2 text-gray-500 hover:bg-gray-100 rounded" title="印刷"><Icons.Printer/></button>
+                            <label className="p-2 text-gray-500 hover:bg-gray-100 rounded cursor-pointer" title="バックアップの読み込み"><Icons.Upload/><input type="file" onChange={uploadBackup} className="hidden" accept=".json"/></label>
+                            <button onClick={downloadBackup} className="p-2 text-gray-500 hover:bg-gray-100 rounded" title="バックアップの保存"><Icons.Download/></button>
+                            <button onClick={()=>setSettingsOpen(true)} className="p-2 text-gray-500 hover:bg-gray-100 rounded relative" title="設定"><Icons.Settings/>{!isCloudLoaded&&useCloud&&<span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>}</button>
                         </div>
                     </header>
 
-                    <main className="flex-1 overflow-hidden relative flex flex-col print:overflow-visible">
-                        {/* ... existing navigator code ... */}
-                        <div className="flex items-center justify-between px-6 py-3 bg-white border-b shrink-0 no-print">
+                    <main className="flex-1 flex flex-col overflow-hidden print:overflow-visible">
+                        <div className="bg-white border-b px-6 py-2 flex justify-between items-center shrink-0 no-print">
                             <div className="flex items-center gap-4">
-                                <button onClick={() => viewMode === 'month' ? navigateMonth(-1) : navigateWeek(-1)} className="p-1 hover:bg-gray-100 rounded-full"><Icons.ChevronLeft/></button>
-                                <h2 className="text-2xl font-bold font-mono text-gray-800 flex items-baseline gap-2">
-                                    {currentDate.getFullYear()}年 {currentDate.getMonth() + 1}月 
-                                    {viewMode === 'week' && <span className="text-lg text-gray-400 font-normal">第{weekNumber}週</span>}
-                                </h2>
-                                <button onClick={() => viewMode === 'month' ? navigateMonth(1) : navigateWeek(1)} className="p-1 hover:bg-gray-100 rounded-full"><Icons.ChevronRight/></button>
-                                <button onClick={navigateToToday} className="text-xs bg-gray-200 px-2 py-1 rounded hover:bg-gray-300">今日</button>
+                                <button onClick={() => { const nd=new Date(date); view==='month'?nd.setMonth(nd.getMonth()-1):nd.setDate(nd.getDate()-7); setDate(nd); }} className="p-1 hover:bg-gray-100 rounded-full"><Icons.ChevronLeft/></button>
+                                <h2 className="text-xl font-bold font-mono text-gray-800">{date.getFullYear()}年 {date.getMonth() + 1}月 {view==='week' && <span className="text-base text-gray-400 ml-2">第{wNum}週</span>}</h2>
+                                <button onClick={() => { const nd=new Date(date); view==='month'?nd.setMonth(nd.getMonth()+1):nd.setDate(nd.getDate()+7); setDate(nd); }} className="p-1 hover:bg-gray-100 rounded-full"><Icons.ChevronRight/></button>
+                                <button onClick={()=>{setDate(new Date()); setView('week');}} className="text-xs bg-gray-200 px-2 py-1 rounded font-bold">今日</button>
                             </div>
                         </div>
 
-                        {/* Print Header */}
-                        <div className="print-only p-4 border-b text-center">
-                            <h1 className="text-2xl font-bold">{currentDate.getFullYear()}年 {currentDate.getMonth() + 1}月 第{weekNumber}週 週案</h1>
-                            <p className="text-sm text-gray-600 text-right">{teacherTitle}</p>
-                        </div>
-
                         <div className="flex-1 overflow-hidden print:overflow-visible">
-                            {viewMode === 'week' && (
+                            {view === 'week' && (
                                 <div className="h-full overflow-auto custom-scrollbar p-4 print:p-0 print:overflow-visible">
-                                    <div className="bg-white shadow rounded-lg overflow-hidden border border-gray-200 min-w-[800px] print:shadow-none print:min-w-0 print:border-black">
-                                        <div className="grid grid-cols-[80px_repeat(6,1fr)] bg-gray-50 border-b border-gray-200 print:bg-white print:border-black">
-                                            <div className="p-3 text-center text-xs font-bold text-gray-500 uppercase tracking-wider border-r print:text-black print:border-black">時限</div>
-                                            {weekDates.map((date, i) => (
-                                                <div key={i} className={`p-2 text-center border-r last:border-r-0 print:border-black ${
-                                                    date.toDateString() === new Date().toDateString() ? 'bg-blue-50 print:bg-white' : ''
-                                                }`}>
-                                                    <div className="text-xs text-gray-500 print:text-black">{WEEK_DAYS[i]}</div>
-                                                    <div className={`text-lg font-bold print:text-black ${
-                                                        i === 5 ? 'text-blue-600' : 'text-gray-800'
-                                                    }`}>
-                                                        {date.getDate()}
+                                    <div className="bg-white shadow rounded border min-w-[800px] print:shadow-none print:min-w-0 print:border-black">
+                                        <div className="grid grid-cols-[80px_repeat(6,1fr)] bg-gray-50 border-b print:bg-white print:border-black">
+                                            <div className="p-3 text-center text-xs font-bold text-gray-500 border-r">時限</div>
+                                            {wDates.map((d, i) => {
+                                                const isT = d.toDateString() === new Date().toDateString();
+                                                return (
+                                                    <div key={i} className={"p-2 text-center border-r last:border-r-0 " + (isT?"bg-blue-50":"")}>
+                                                        <div className="text-xs text-gray-500">{WEEK_DAYS[i]}</div>
+                                                        <div className={"text-lg font-bold " + (i===5?"text-blue-600":"text-gray-800")}>{d.getDate()}</div>
                                                     </div>
-                                                </div>
-                                            ))}
+                                                );
+                                            })}
                                         </div>
-
                                         {TIME_SLOTS.map(slot => {
-                                            let labelBgClass = 'bg-gray-50';
-                                            if (slot.id === 'lunch') labelBgClass = 'bg-gray-100';
-                                            else if (slot.id === 'todo') labelBgClass = 'bg-red-100';
-                                            else if (slot.id === 'collection') labelBgClass = 'bg-blue-100';
-                                            else if (slot.id === 'morning') labelBgClass = 'bg-yellow-100';
-                                            else if (['after', 'memo'].includes(slot.id)) labelBgClass = 'bg-orange-100';
-
+                                            let lb = 'bg-gray-50';
+                                            if(slot.id==='lunch') lb='bg-gray-100'; else if(['todo','collection','morning'].includes(slot.id)) lb='bg-yellow-100'; else if(['after','memo'].includes(slot.id)) lb='bg-orange-100';
                                             return (
-                                            <div key={slot.id} className="grid grid-cols-[80px_repeat(6,1fr)] hover:bg-gray-50 transition-colors print:hover:bg-transparent print-row">
-                                                <div className={`
-                                                    border-b border-r border-gray-200 flex items-center justify-center text-xs font-bold text-gray-600 print:bg-white print:text-black print:border-black
-                                                    ${labelBgClass}
-                                                `}>
-                                                    {slot.label}
+                                                <div key={slot.id} className="grid grid-cols-[80px_repeat(6,1fr)] hover:bg-gray-50 print-row">
+                                                    <div className={"border-b border-r flex items-center justify-center text-xs font-bold text-gray-600 " + lb}>{slot.label}</div>
+                                                    {wDates.map((d, i) => <div key={i} className="print-border"><SlotCell dateKey={formatDateKey(d)} slot={slot} /></div>)}
                                                 </div>
-                                                {weekDates.map((date, i) => (
-                                                    <div key={i} className="print:border-b print:border-r print:border-black">
-                                                        <SlotCell 
-                                                            key={i} 
-                                                            dateKey={formatDateKey(date)} 
-                                                            slot={slot}
-                                                            date={date}
-                                                        />
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        )})}
+                                            );
+                                        })}
                                     </div>
                                 </div>
                             )}
-
-                            {viewMode === 'month' && (
-                                <MonthView 
-                                    currentDate={currentDate} 
-                                    data={scheduleData}
-                                    classList={classList}
-                                    onNavigateToWeek={handleNavigateFromMonth}
-                                />
-                            )}
-
-                            {viewMode === 'history' && (
-                                <div className="h-full p-4">
-                                    <ClassHistoryView data={scheduleData} classes={classList} />
-                                </div>
-                            )}
-
-                            {viewMode === 'stats' && (
-                                <div className="h-full p-4">
-                                    <StatsView 
-                                        data={scheduleData} 
-                                        classes={classList} 
-                                        currentDate={currentDate} 
-                                    />
-                                </div>
-                            )}
+                            {view === 'month' && <MonthView date={date} data={data} onNav={d=>{setDate(d);setView('week');}} classes={classes} />}
+                            {view === 'history' && <div className="h-full p-4"><ClassHistoryView data={data} classes={classes} /></div>}
+                            {view === 'stats' && <div className="h-full p-4"><StatsView data={data} classes={classes} date={date} /></div>}
                         </div>
                     </main>
-                    
-                    {/* ... existing modals ... */}
-                    <SlotModal 
-                        isOpen={slotModalInfo.isOpen}
-                        onClose={() => setSlotModalInfo({ ...slotModalInfo, isOpen: false })}
-                        date={slotModalInfo.date}
-                        slotId={slotModalInfo.slotId}
-                        data={scheduleData[slotModalInfo.date]?.[slotModalInfo.slotId]}
-                        onSave={handleSaveSlot}
-                        classOptions={classList}
-                    />
 
-                    <SettingsModal 
-                        isOpen={isSettingsOpen}
-                        onClose={() => setSettingsOpen(false)}
-                        classes={classList}
-                        onUpdateClasses={handleUpdateClasses}
-                        syncId={syncId}
-                        onUpdateSyncId={setSyncId}
-                        onTriggerSync={fetchFromCloud}
-                        isSyncing={isSyncing}
-                        teacherTitle={teacherTitle}
-                        onUpdateTeacherTitle={handleUpdateTeacherTitle}
-                    />
+                    <SlotModal isOpen={modal.isOpen} onClose={()=>setModal({...modal, isOpen:false})} date={modal.date} slotId={modal.slotId} data={(data[modal.date]||{})[modal.slotId]} onSave={handleSaveSlot} classOptions={classes} />
+                    <SettingsModal isOpen={isSettingsOpen} onClose={()=>setSettingsOpen(false)} classes={classes} onUpdateClasses={c=>{setClasses(c); if(isCloudLoaded)saveCloud(data,c,title);}} syncId={syncId} onUpdateSyncId={setSyncId} appId={appId} onUpdateAppId={setAppId} onTriggerSync={triggerSync} isSyncing={isSyncing} title={title} onUpdateTitle={t=>{setTitle(t); if(isCloudLoaded)saveCloud(data,classes,t);}} />
                 </div>
             );
         };
 
-        const root = ReactDOM.createRoot(document.getElementById('root'));
-        root.render(<App />);
+        const root = ReactDOM.createRoot(document.getElementById('root')); 
+        root.render(<ErrorBoundary><App /></ErrorBoundary>);
     </script>
 </body>
 </html>
