@@ -64,7 +64,7 @@
         }
 
         const { useState, useEffect, useMemo, useCallback, Component } = React;
-        const APP_VERSION = "6.1.7"; // 年度更新・データリセット機能追加版
+        const APP_VERSION = "6.2.0"; // 行事予定表タブ・PDFリンク表示機能追加版
 
         class ErrorBoundary extends Component {
             constructor(props) { super(props); this.state = { hasError: false, error: null }; }
@@ -159,7 +159,8 @@
             Wifi: ({size=16, className=""}) => <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M1.42 9a16 16 0 0 1 21.16 0"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><line x1="12" y1="20" x2="12.01" y2="20"/></svg>,
             Database: ({size=16, className=""}) => <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>,
             Printer: ({size=20, className=""}) => <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect width="12" height="8" x="6" y="14"/></svg>,
-            Search: ({size=20, className=""}) => <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+            Search: ({size=20, className=""}) => <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>,
+            FileText: ({size=20, className=""}) => <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
         };
 
         // --- Views & Modals ---
@@ -470,6 +471,7 @@
             const [data, setData] = useState({}); 
             const [classes, setClasses] = useState(DEFAULT_CLASSES);
             const [title, setTitle] = useState("担任");
+            const [eventUrl, setEventUrl] = useState(''); // 行事予定表URLのステート
             const [appId, setAppId] = useState(initialAppId);
             const [syncId, setSyncId] = useState(() => localStorage.getItem('teacherLogSyncId') || generateId());
             const [isSyncing, setIsSyncing] = useState(false);
@@ -494,6 +496,8 @@
                 setClasses(loadSafe('teachersLogClasses', DEFAULT_CLASSES, true));
                 const sTit = localStorage.getItem('teacherLogTitle');
                 if (sTit) setTitle(sTit);
+                const sEvent = localStorage.getItem('teacherLogEventUrl');
+                if (sEvent) setEventUrl(sEvent);
             }, []);
 
             useEffect(() => {
@@ -521,6 +525,7 @@
                         if(d.schedule) setData(d.schedule); 
                         if(d.classes && Array.isArray(d.classes)) setClasses(d.classes); 
                         if(d.title) setTitle(d.title);
+                        if(d.eventUrl !== undefined) setEventUrl(d.eventUrl);
                     }
                     setIsCloudLoaded(true);
                 }, err => {
@@ -529,13 +534,14 @@
                 return () => unsub();
             }, [user, syncId, appId]);
 
-            const saveCloud = useCallback(async (nd=data, nc=classes, nt=title) => {
+            // 保存時に eventUrl も含める
+            const saveCloud = useCallback(async (nd=data, nc=classes, nt=title, ne=eventUrl) => {
                 if (!useCloud || !db || !user) return false;
                 try {
-                    await db.collection('artifacts').doc(appId).collection('public').doc('data').collection('weekly_plans').doc(syncId).set({ schedule: nd||{}, classes: nc||[], title: nt||"", updated: new Date().toISOString() }, { merge: true });
+                    await db.collection('artifacts').doc(appId).collection('public').doc('data').collection('weekly_plans').doc(syncId).set({ schedule: nd||{}, classes: nc||[], title: nt||"", eventUrl: ne||"", updated: new Date().toISOString() }, { merge: true });
                     return true;
                 } catch(e){ return false; }
-            }, [user, syncId, appId, data, classes, title]);
+            }, [user, syncId, appId, data, classes, title, eventUrl]);
 
             const triggerSync = async (tid, taid) => {
                 if (!useCloud || !db || !user) return;
@@ -548,6 +554,7 @@
                             if(d.schedule) setData(d.schedule); 
                             if(d.classes && Array.isArray(d.classes)) setClasses(d.classes); 
                             if(d.title) setTitle(d.title);
+                            if(d.eventUrl !== undefined) setEventUrl(d.eventUrl);
                             alert("ロード完了");
                         }
                     } else {
@@ -562,7 +569,7 @@
 
             useEffect(() => { localStorage.setItem('teachersLogData', JSON.stringify(data)); }, [data]);
             useEffect(() => { localStorage.setItem('teachersLogClasses', JSON.stringify(classes)); }, [classes]);
-            useEffect(() => { localStorage.setItem('teacherLogSyncId', syncId); localStorage.setItem('teacherLogAppId', appId); localStorage.setItem('teacherLogTitle', title); }, [syncId, appId, title]);
+            useEffect(() => { localStorage.setItem('teacherLogSyncId', syncId); localStorage.setItem('teacherLogAppId', appId); localStorage.setItem('teacherLogTitle', title); localStorage.setItem('teacherLogEventUrl', eventUrl); }, [syncId, appId, title, eventUrl]);
 
             const mon = getMonday(date);
             const wNum = Math.ceil(mon.getDate() / 7); 
@@ -570,12 +577,13 @@
             
             const handleSaveSlot = (dk, sid, nd) => {
                 const upd = { ...data, [dk]: { ...(data[dk]||{}), [sid]: nd } };
-                setData(upd); if (isCloudLoaded) saveCloud(upd, classes, title);
+                setData(upd); if (isCloudLoaded) saveCloud(upd, classes, title, eventUrl);
             };
 
             const downloadBackup = () => {
                 const a = document.createElement('a');
-                a.href = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify({ schedule: data, classes: classes, title: title }));
+                // バックアップにも eventUrl を追加
+                a.href = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify({ schedule: data, classes: classes, title: title, eventUrl: eventUrl }));
                 a.download = "backup_" + formatDateKey(new Date()) + ".json";
                 a.click();
             };
@@ -587,7 +595,8 @@
                     const msg2 = "本当にすべての記録を消去します。この操作は元に戻せません。\nよろしいですか？";
                     if (window.confirm(msg2)) {
                         setData({});
-                        if (isCloudLoaded) saveCloud({}, classes, title);
+                        setEventUrl(''); // リセット時は行事予定表のURLもクリア
+                        if (isCloudLoaded) saveCloud({}, classes, title, '');
                         alert("すべての記録を消去しました。新しい年度の準備が完了しました。");
                     }
                 }
@@ -604,7 +613,8 @@
                         if(p.schedule) setData(p.schedule); 
                         if(p.classes && Array.isArray(p.classes)) setClasses(p.classes); 
                         if(p.title) setTitle(p.title);
-                        if(isCloudLoaded) saveCloud(p.schedule, p.classes, p.title);
+                        if(p.eventUrl !== undefined) setEventUrl(p.eventUrl);
+                        if(isCloudLoaded) saveCloud(p.schedule, p.classes, p.title, p.eventUrl || '');
                         alert("データを安全に復元しました。");
                     } catch (error) {
                         alert("復元に失敗しました。ファイルが壊れている可能性があります。");
@@ -640,12 +650,13 @@
                                 <p className="text-xs text-gray-500 mt-1">{title} {useCloud && <span className={"ml-2 " + (isCloudLoaded ? "text-green-500":"text-gray-400")}>●</span>}</p>
                             </div>
                         </div>
-                        <div className="flex bg-gray-100 p-1 rounded-lg">
-                            {[{id:'month',l:'月'},{id:'week',l:'週'},{id:'history',l:'履歴'},{id:'stats',l:'集計'}].map(m => (
-                                <button key={m.id} onClick={()=>setView(m.id)} className={"px-4 py-1.5 text-sm font-bold rounded transition " + (view===m.id ? "bg-white shadow text-blue-600":"text-gray-500 hover:text-gray-800")}>{m.l}</button>
+                        <div className="flex bg-gray-100 p-1 rounded-lg overflow-x-auto custom-scrollbar">
+                            {/* 新しい「行事予定」タブを追加 */}
+                            {[{id:'month',l:'月'},{id:'week',l:'週'},{id:'events',l:'行事予定'},{id:'history',l:'履歴'},{id:'stats',l:'集計'}].map(m => (
+                                <button key={m.id} onClick={()=>setView(m.id)} className={"px-2 md:px-4 py-1.5 text-xs md:text-sm font-bold rounded transition whitespace-nowrap " + (view===m.id ? "bg-white shadow text-blue-600":"text-gray-500 hover:text-gray-800")}>{m.l}</button>
                             ))}
                         </div>
-                        <div className="flex gap-1">
+                        <div className="flex gap-1 ml-2">
                             <button onClick={()=>window.print()} className="p-2 text-gray-500 hover:bg-gray-100 rounded" title="印刷"><Icons.Printer/></button>
                             <label className="p-2 text-gray-500 hover:bg-gray-100 rounded cursor-pointer" title="バックアップの読み込み"><Icons.Upload/><input type="file" onChange={uploadBackup} className="hidden" accept=".json"/></label>
                             <button onClick={downloadBackup} className="p-2 text-gray-500 hover:bg-gray-100 rounded" title="バックアップの保存"><Icons.Download/></button>
@@ -654,14 +665,17 @@
                     </header>
 
                     <main className="flex-1 flex flex-col overflow-hidden print:overflow-visible">
-                        <div className="bg-white border-b px-6 py-2 flex justify-between items-center shrink-0 no-print">
-                            <div className="flex items-center gap-4">
-                                <button onClick={() => { const nd=new Date(date); view==='month'?nd.setMonth(nd.getMonth()-1):nd.setDate(nd.getDate()-7); setDate(nd); }} className="p-1 hover:bg-gray-100 rounded-full"><Icons.ChevronLeft/></button>
-                                <h2 className="text-xl font-bold font-mono text-gray-800">{date.getFullYear()}年 {date.getMonth() + 1}月 {view==='week' && <span className="text-base text-gray-400 ml-2">第{wNum}週</span>}</h2>
-                                <button onClick={() => { const nd=new Date(date); view==='month'?nd.setMonth(nd.getMonth()+1):nd.setDate(nd.getDate()+7); setDate(nd); }} className="p-1 hover:bg-gray-100 rounded-full"><Icons.ChevronRight/></button>
-                                <button onClick={()=>{setDate(new Date()); setView('week');}} className="text-xs bg-gray-200 px-2 py-1 rounded font-bold">今日</button>
+                        {/* 行事予定タブ以外のときに日付コントロールを表示 */}
+                        {view !== 'events' && (
+                            <div className="bg-white border-b px-6 py-2 flex justify-between items-center shrink-0 no-print">
+                                <div className="flex items-center gap-4">
+                                    <button onClick={() => { const nd=new Date(date); view==='month'?nd.setMonth(nd.getMonth()-1):nd.setDate(nd.getDate()-7); setDate(nd); }} className="p-1 hover:bg-gray-100 rounded-full"><Icons.ChevronLeft/></button>
+                                    <h2 className="text-xl font-bold font-mono text-gray-800">{date.getFullYear()}年 {date.getMonth() + 1}月 {view==='week' && <span className="text-base text-gray-400 ml-2">第{wNum}週</span>}</h2>
+                                    <button onClick={() => { const nd=new Date(date); view==='month'?nd.setMonth(nd.getMonth()+1):nd.setDate(nd.getDate()+7); setDate(nd); }} className="p-1 hover:bg-gray-100 rounded-full"><Icons.ChevronRight/></button>
+                                    <button onClick={()=>{setDate(new Date()); setView('week');}} className="text-xs bg-gray-200 px-2 py-1 rounded font-bold">今日</button>
+                                </div>
                             </div>
-                        </div>
+                        )}
 
                         <div className="flex-1 overflow-hidden print:overflow-visible">
                             {view === 'week' && (
@@ -693,13 +707,81 @@
                                 </div>
                             )}
                             {view === 'month' && <MonthView date={date} data={data} onNav={d=>{setDate(d);setView('week');}} classes={classes} />}
+                            
+                            {/* 追加された「行事予定表」タブの中身 */}
+                            {view === 'events' && (
+                                <div className="h-full p-4 flex flex-col">
+                                    <div className="bg-white rounded-lg shadow border flex-1 flex flex-col overflow-hidden">
+                                        <div className="p-4 border-b flex justify-between items-center bg-gray-50 shrink-0">
+                                            <h2 className="text-lg font-bold flex items-center gap-2"><Icons.FileText /> 行事予定表</h2>
+                                            {eventUrl && (
+                                                <button 
+                                                    onClick={() => { setEventUrl(''); if(isCloudLoaded) saveCloud(data, classes, title, ''); }} 
+                                                    className="text-xs bg-red-100 text-red-600 px-3 py-1.5 rounded font-bold hover:bg-red-200 transition-colors"
+                                                >
+                                                    URLを解除
+                                                </button>
+                                            )}
+                                        </div>
+                                        <div className="flex-1 bg-gray-200 relative">
+                                            {eventUrl ? (
+                                                <iframe src={eventUrl} className="w-full h-full border-0" title="Event Schedule"></iframe>
+                                            ) : (
+                                                <div className="absolute inset-0 flex flex-col items-center justify-center text-gray-600 p-6 text-center overflow-y-auto custom-scrollbar">
+                                                    <Icons.FileText size={64} className="mb-4 opacity-30" />
+                                                    <h3 className="text-lg font-bold mb-2">行事予定表（PDF等）のリンクを設定</h3>
+                                                    <p className="text-sm mb-6 max-w-md">
+                                                        複数端末で予定表を同期して確認できるように、<br/>
+                                                        学校HPのリンクや、<b>GoogleドライブにアップロードしたPDFの共有リンク</b>を貼り付けてください。
+                                                    </p>
+                                                    <div className="flex w-full max-w-lg gap-2 mb-6">
+                                                        <input 
+                                                            type="url" 
+                                                            placeholder="https://drive.google.com/file/d/..." 
+                                                            className="flex-1 border p-2 rounded shadow-sm"
+                                                            id="eventUrlInput"
+                                                        />
+                                                        <button 
+                                                            onClick={() => {
+                                                                const val = document.getElementById('eventUrlInput').value;
+                                                                if(val) {
+                                                                    // Googleドライブのリンクを自動でプレビュー用に変換する処理
+                                                                    let finalUrl = val;
+                                                                    if (finalUrl.includes('drive.google.com/file/d/')) {
+                                                                        finalUrl = finalUrl.replace('/view?usp=sharing', '/preview').replace('/view', '/preview');
+                                                                    }
+                                                                    setEventUrl(finalUrl);
+                                                                    if (isCloudLoaded) saveCloud(data, classes, title, finalUrl);
+                                                                }
+                                                            }}
+                                                            className="bg-blue-600 text-white font-bold px-4 py-2 rounded shadow hover:bg-blue-700 whitespace-nowrap transition-colors"
+                                                        >
+                                                            保存して表示
+                                                        </button>
+                                                    </div>
+                                                    <div className="text-xs text-gray-500 text-left bg-white p-4 rounded shadow-sm border border-gray-200 max-w-lg w-full">
+                                                        <p className="font-bold text-gray-700 mb-1">【GoogleドライブのPDFを貼る場合の手順】</p>
+                                                        <ol className="list-decimal pl-4 space-y-1">
+                                                            <li>予定表のPDFをGoogleドライブに保存する</li>
+                                                            <li>ファイルを右クリック ＞ 「共有」</li>
+                                                            <li>一般的なアクセスを「<b>リンクを知っている全員</b>」に変更</li>
+                                                            <li>「リンクをコピー」して、上の枠に貼り付ける</li>
+                                                        </ol>
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
                             {view === 'history' && <div className="h-full p-4"><ClassHistoryView data={data} classes={classes} /></div>}
                             {view === 'stats' && <div className="h-full p-4"><StatsView data={data} classes={classes} date={date} /></div>}
                         </div>
                     </main>
 
                     <SlotModal isOpen={modal.isOpen} onClose={()=>setModal({...modal, isOpen:false})} date={modal.date} slotId={modal.slotId} data={(data[modal.date]||{})[modal.slotId]} onSave={handleSaveSlot} classOptions={classes} />
-                    <SettingsModal isOpen={isSettingsOpen} onClose={()=>setSettingsOpen(false)} classes={classes} onUpdateClasses={c=>{setClasses(c); if(isCloudLoaded)saveCloud(data,c,title);}} syncId={syncId} onUpdateSyncId={setSyncId} appId={appId} onUpdateAppId={setAppId} onTriggerSync={triggerSync} isSyncing={isSyncing} title={title} onUpdateTitle={t=>{setTitle(t); if(isCloudLoaded)saveCloud(data,classes,t);}} onResetData={handleResetData} />
+                    <SettingsModal isOpen={isSettingsOpen} onClose={()=>setSettingsOpen(false)} classes={classes} onUpdateClasses={c=>{setClasses(c); if(isCloudLoaded)saveCloud(data,c,title,eventUrl);}} syncId={syncId} onUpdateSyncId={setSyncId} appId={appId} onUpdateAppId={setAppId} onTriggerSync={triggerSync} isSyncing={isSyncing} title={title} onUpdateTitle={t=>{setTitle(t); if(isCloudLoaded)saveCloud(data,classes,t,eventUrl);}} onResetData={handleResetData} />
                 </div>
             );
         };
