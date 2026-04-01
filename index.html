@@ -64,7 +64,7 @@
         }
 
         const { useState, useEffect, useMemo, useCallback, Component } = React;
-        const APP_VERSION = "6.8.1"; // 徹底デバッグ・安定化版
+        const APP_VERSION = "6.8.2"; // 全員出席ボタン改良・表示追加版
 
         class ErrorBoundary extends Component {
             constructor(props) { super(props); this.state = { hasError: false, error: null }; }
@@ -187,18 +187,19 @@
         const SlotModal = ({ isOpen, onClose, date, slotId, data, onSave, classOptions, studentsData, homeroomClass }) => {
             if (!isOpen) return null;
             
-            // 土日メモ用の仮想スロット定義
             let slotDef = TIME_SLOTS.find(s => s.id === slotId);
             if (slotId === 'sat_memo') slotDef = { label: '土曜メモ', type: 'memo' };
             if (slotId === 'sun_memo') slotDef = { label: '日曜メモ', type: 'memo' };
 
-            // 出欠入力が可能なスロット（授業または欠席枠）
             const isClass = slotDef && slotDef.type === 'class';
             const isAttendanceTarget = isClass || slotId === 'absence';
             
-            const [localData, setLocalData] = useState(data || { plan: '', actual: '', classId: '', targetClass: '', memo: '', unit: '', attendance: {} });
+            // localDataに allPresent 状態を追加
+            const [localData, setLocalData] = useState(data || { plan: '', actual: '', classId: '', targetClass: '', memo: '', unit: '', attendance: {}, allPresent: false });
 
-            useEffect(() => { setLocalData(data || { plan: '', actual: '', classId: '', targetClass: '', memo: '', unit: '', attendance: {} }); }, [data, isOpen]);
+            useEffect(() => { 
+                setLocalData(data || { plan: '', actual: '', classId: '', targetClass: '', memo: '', unit: '', attendance: {}, allPresent: false }); 
+            }, [data, isOpen]);
 
             const dStr = new Date(date).toLocaleDateString('ja-JP', { month: 'long', day: 'numeric', weekday: 'long' });
 
@@ -209,23 +210,29 @@
                 } else {
                     newAtt[sId] = status;
                 }
-                setLocalData({ ...localData, attendance: newAtt });
+                // 個別の出欠をつけたら全員出席は自動的に解除される
+                setLocalData({ ...localData, attendance: newAtt, allPresent: false });
             };
 
-            // 科目/クラス選択時のロジック
+            const toggleAllPresent = () => {
+                setLocalData(prev => ({
+                    ...prev,
+                    allPresent: !prev.allPresent,
+                    // 全員出席をオンにしたら個別の出欠はリセットする
+                    attendance: !prev.allPresent ? {} : prev.attendance
+                }));
+            };
+
             const selectedMain = localData.classId;
             const hasStudents = (cId) => studentsData && studentsData[cId];
             const hasStudentsData = studentsData && Object.keys(studentsData).length > 0;
             
-            // 選んだ科目が名簿にない場合（HR、道徳など）
             const needTargetClass = selectedMain && !hasStudents(selectedMain) && hasStudentsData;
             
-            // 実際に出欠を取る対象のクラス（自動的に homeroomClass を適用）
             const attendanceTargetClass = needTargetClass 
                 ? (localData.targetClass || homeroomClass) 
                 : (hasStudents(selectedMain) ? selectedMain : null);
 
-            // 保存時に、targetClassが未設定でhomeroomClassが適用されていた場合はそれを保存する
             const handleSaveClick = () => {
                 const finalData = { ...localData };
                 if (needTargetClass && !finalData.targetClass && homeroomClass) {
@@ -251,7 +258,6 @@
                                         <ClassSelector selectedClass={localData.classId} onSelect={c => setLocalData({...localData, classId: c===localData.classId?'':c})} classes={classOptions} />
                                     </div>
                                     
-                                    {/* メインで選んだものが名簿に無い場合（道徳など）、対象クラスを選択するUIを表示 */}
                                     {needTargetClass && (
                                         <div className="p-3 bg-blue-50 rounded-lg border border-blue-100">
                                             <label className="block text-xs font-bold text-blue-800 mb-2">出欠を記録する対象クラスを選択</label>
@@ -280,8 +286,8 @@
                                     <div className="flex justify-between items-end mb-1">
                                         <label className="block text-sm font-bold text-gray-700">出欠入力 {needTargetClass ? `(${attendanceTargetClass})` : ''}</label>
                                         <button 
-                                            onClick={() => setLocalData({ ...localData, attendance: {} })}
-                                            className="text-xs bg-green-100 text-green-700 hover:bg-green-200 px-3 py-1.5 rounded font-bold border border-green-300 transition-colors shadow-sm"
+                                            onClick={toggleAllPresent}
+                                            className={`text-xs px-3 py-1.5 rounded font-bold border transition-colors shadow-sm ${localData.allPresent ? 'bg-green-600 text-white border-green-700' : 'bg-white text-green-600 border-green-300 hover:bg-green-50'}`}
                                         >
                                             全員出席
                                         </button>
@@ -304,7 +310,7 @@
                                 </div>
                             )}
 
-                            {/* 単元入力エリア（3行分） */}
+                            {/* 単元入力エリア */}
                             {isClass && (
                                 <div className="shrink-0 flex flex-col space-y-1 mt-2">
                                     <label className="block text-sm font-bold text-gray-700">単元</label>
@@ -464,7 +470,6 @@
                                 </div>
                             </div>
                             
-                            {/* 生徒名簿CSV読み込み・ダウンロードエリア */}
                             <div className="bg-indigo-50 p-4 rounded-lg border border-indigo-200 space-y-3 mt-4">
                                 <h3 className="font-bold text-indigo-800 flex items-center gap-1"><Icons.Users size={16}/> 生徒名簿CSVの管理</h3>
                                 <p className="text-xs text-indigo-700 font-medium">
@@ -504,7 +509,6 @@
                                 ))}
                             </div>
 
-                            {/* データリセット（年度更新）エリア */}
                             <div className="bg-red-50 p-4 rounded-lg border border-red-200 space-y-2 mt-6">
                                 <h3 className="font-bold text-red-800 flex items-center gap-1"><Icons.Trash size={16}/> 年度更新・データリセット</h3>
                                 <p className="text-xs text-red-700 font-medium">※すべての予定と実施記録を完全に消去します。<br/>（クラス設定や担任名はそのまま残ります）</p>
@@ -590,13 +594,16 @@
                 Object.keys(data).sort().reverse().forEach(dk => {
                     Object.keys(data[dk] || {}).forEach(sid => {
                         const s = data[dk][sid];
-                        if (!s || (!s.plan && !s.actual && !s.unit && (!s.attendance || Object.keys(s.attendance).length === 0))) return;
+                        if (!s || (!s.plan && !s.actual && !s.unit && (!s.attendance || Object.keys(s.attendance).length === 0) && !s.allPresent)) return;
                         if (selCls !== 'ALL' && s.classId !== selCls) return;
                         if (search && !((s.plan||'').includes(search) || (s.actual||'').includes(search) || (s.unit||'').includes(search))) return;
                         
                         let attStr = "";
                         const attClass = s.targetClass || s.classId; 
-                        if (s.attendance && studentsData && studentsData[attClass]) {
+                        
+                        if (s.allPresent) {
+                            attStr = "全員出席\n";
+                        } else if (s.attendance && studentsData && studentsData[attClass]) {
                             const absents = [], lates = [], earlys = [];
                             Object.keys(s.attendance).forEach(stId => {
                                 const st = studentsData[attClass].find(student => student.id == stId);
@@ -910,7 +917,13 @@
                     else if (!sd.targetClass && homeroomClass && studentsData[homeroomClass]) resolvedAttClass = homeroomClass;
                 }
                 
-                if (attKeys.length > 0 && studentsData && studentsData[resolvedAttClass]) {
+                if (sd.allPresent) {
+                    attDisplay = (
+                        <div className="text-[9px] leading-tight mb-0.5 border-b border-gray-200 pb-0.5 font-bold text-green-600">
+                            全員出席
+                        </div>
+                    );
+                } else if (attKeys.length > 0 && studentsData && studentsData[resolvedAttClass]) {
                     const absents = [], lates = [], earlys = [];
                     attKeys.forEach(sid => {
                         const st = studentsData[resolvedAttClass].find(s => s.id == sid);
