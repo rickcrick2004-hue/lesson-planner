@@ -64,7 +64,7 @@
         }
 
         const { useState, useEffect, useMemo, useCallback, Component } = React;
-        const APP_VERSION = "6.2.0"; // 行事予定表タブ・PDFリンク表示機能追加版
+        const APP_VERSION = "6.8.1"; // 徹底デバッグ・安定化版
 
         class ErrorBoundary extends Component {
             constructor(props) { super(props); this.state = { hasError: false, error: null }; }
@@ -107,15 +107,16 @@
         const TIME_SLOTS = [
             { id: 'todo', label: 'Todo', type: 'memo', height: 'h-16' },       
             { id: 'collection', label: '回収物', type: 'memo', height: 'h-16' }, 
+            { id: 'absence', label: '欠席', type: 'memo', height: 'h-16' },
             { id: 'morning', label: '朝・行事', type: 'special', height: 'h-20' },
-            { id: '1', label: '1限', type: 'class', height: 'h-24' },
-            { id: '2', label: '2限', type: 'class', height: 'h-24' },
-            { id: '3', label: '3限', type: 'class', height: 'h-24' },
-            { id: '4', label: '4限', type: 'class', height: 'h-24' },
+            { id: '1', label: '1限', type: 'class', height: 'h-28' }, 
+            { id: '2', label: '2限', type: 'class', height: 'h-28' },
+            { id: '3', label: '3限', type: 'class', height: 'h-28' },
+            { id: '4', label: '4限', type: 'class', height: 'h-28' },
             { id: 'lunch', label: '昼休み', type: 'break', height: 'h-8' },
-            { id: '5', label: '5限', type: 'class', height: 'h-24' },
-            { id: '6', label: '6限', type: 'class', height: 'h-24' },
-            { id: '7', label: '7限', type: 'class', height: 'h-24' },
+            { id: '5', label: '5限', type: 'class', height: 'h-28' },
+            { id: '6', label: '6限', type: 'class', height: 'h-28' },
+            { id: '7', label: '7限', type: 'class', height: 'h-28' },
             { id: 'after', label: '帰りHR', type: 'special', height: 'h-14' },
             { id: 'memo', label: 'メモ', type: 'memo', height: 'h-20' }
         ];
@@ -160,7 +161,8 @@
             Database: ({size=16, className=""}) => <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>,
             Printer: ({size=20, className=""}) => <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect width="12" height="8" x="6" y="14"/></svg>,
             Search: ({size=20, className=""}) => <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>,
-            FileText: ({size=20, className=""}) => <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+            FileText: ({size=20, className=""}) => <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>,
+            Users: ({size=20, className=""}) => <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
         };
 
         // --- Views & Modals ---
@@ -170,7 +172,7 @@
                 <div className="flex flex-wrap gap-2">
                     {classes.map((c, idx) => {
                         const isSel = selectedClass === c.name;
-                        const t = COLOR_PALETTE[c.color || 'gray'];
+                        const t = COLOR_PALETTE[c.color] || COLOR_PALETTE['gray'];
                         const cls = isSel ? (t.bg + " text-white " + t.border + " ring-2 ring-offset-1 " + t.ring + " scale-105") : (t.bgLight + " " + t.text + " border-gray-200 opacity-80 hover:opacity-100 hover:scale-105");
                         return (
                             <button key={idx} onClick={() => onSelect(c.name)} className={"px-3 py-2 rounded-lg text-sm font-bold border transition-all shadow-sm " + cls}>
@@ -182,39 +184,147 @@
             );
         };
 
-        const SlotModal = ({ isOpen, onClose, date, slotId, data, onSave, classOptions }) => {
+        const SlotModal = ({ isOpen, onClose, date, slotId, data, onSave, classOptions, studentsData, homeroomClass }) => {
             if (!isOpen) return null;
-            const slotDef = TIME_SLOTS.find(s => s.id === slotId);
-            const isClass = slotDef?.type === 'class';
-            const [localData, setLocalData] = useState(data || { plan: '', actual: '', classId: '', memo: '' });
+            
+            // 土日メモ用の仮想スロット定義
+            let slotDef = TIME_SLOTS.find(s => s.id === slotId);
+            if (slotId === 'sat_memo') slotDef = { label: '土曜メモ', type: 'memo' };
+            if (slotId === 'sun_memo') slotDef = { label: '日曜メモ', type: 'memo' };
 
-            useEffect(() => { setLocalData(data || { plan: '', actual: '', classId: '', memo: '' }); }, [data, isOpen]);
+            // 出欠入力が可能なスロット（授業または欠席枠）
+            const isClass = slotDef && slotDef.type === 'class';
+            const isAttendanceTarget = isClass || slotId === 'absence';
+            
+            const [localData, setLocalData] = useState(data || { plan: '', actual: '', classId: '', targetClass: '', memo: '', unit: '', attendance: {} });
+
+            useEffect(() => { setLocalData(data || { plan: '', actual: '', classId: '', targetClass: '', memo: '', unit: '', attendance: {} }); }, [data, isOpen]);
 
             const dStr = new Date(date).toLocaleDateString('ja-JP', { month: 'long', day: 'numeric', weekday: 'long' });
+
+            const setAttendance = (sId, status) => {
+                const newAtt = { ...(localData.attendance || {}) };
+                if (newAtt[sId] === status) {
+                    delete newAtt[sId]; // 解除
+                } else {
+                    newAtt[sId] = status;
+                }
+                setLocalData({ ...localData, attendance: newAtt });
+            };
+
+            // 科目/クラス選択時のロジック
+            const selectedMain = localData.classId;
+            const hasStudents = (cId) => studentsData && studentsData[cId];
+            const hasStudentsData = studentsData && Object.keys(studentsData).length > 0;
+            
+            // 選んだ科目が名簿にない場合（HR、道徳など）
+            const needTargetClass = selectedMain && !hasStudents(selectedMain) && hasStudentsData;
+            
+            // 実際に出欠を取る対象のクラス（自動的に homeroomClass を適用）
+            const attendanceTargetClass = needTargetClass 
+                ? (localData.targetClass || homeroomClass) 
+                : (hasStudents(selectedMain) ? selectedMain : null);
+
+            // 保存時に、targetClassが未設定でhomeroomClassが適用されていた場合はそれを保存する
+            const handleSaveClick = () => {
+                const finalData = { ...localData };
+                if (needTargetClass && !finalData.targetClass && homeroomClass) {
+                    finalData.targetClass = homeroomClass;
+                }
+                onSave(date, slotId, finalData);
+                onClose();
+            };
 
             return (
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 md:p-6">
                     <div className="bg-white rounded-xl w-full max-w-2xl shadow-2xl flex flex-col h-[90vh]">
                         <div className="p-4 border-b bg-gray-800 text-white flex justify-between items-center shrink-0 rounded-t-xl">
-                            <div><h2 className="text-lg font-bold">{dStr}</h2><span className="text-sm bg-gray-700 px-2 py-0.5 rounded">{slotDef?.label}</span></div>
+                            <div><h2 className="text-lg font-bold">{dStr}</h2><span className="text-sm bg-gray-700 px-2 py-0.5 rounded">{slotDef ? slotDef.label : ''}</span></div>
                             <button onClick={onClose} className="p-2 hover:bg-gray-700 rounded-full transition-colors"><Icons.X /></button>
                         </div>
                         
                         <div className="p-5 overflow-y-auto flex-1 flex flex-col gap-4 custom-scrollbar">
+                            {isAttendanceTarget && (
+                                <div className="shrink-0 space-y-3">
+                                    <div>
+                                        <label className="block text-xs font-bold text-gray-500 mb-2">クラス・科目</label>
+                                        <ClassSelector selectedClass={localData.classId} onSelect={c => setLocalData({...localData, classId: c===localData.classId?'':c})} classes={classOptions} />
+                                    </div>
+                                    
+                                    {/* メインで選んだものが名簿に無い場合（道徳など）、対象クラスを選択するUIを表示 */}
+                                    {needTargetClass && (
+                                        <div className="p-3 bg-blue-50 rounded-lg border border-blue-100">
+                                            <label className="block text-xs font-bold text-blue-800 mb-2">出欠を記録する対象クラスを選択</label>
+                                            <div className="flex flex-wrap gap-2">
+                                                {Object.keys(studentsData).map(cName => {
+                                                    const isActive = (localData.targetClass || homeroomClass) === cName;
+                                                    return (
+                                                        <button 
+                                                            key={cName} 
+                                                            onClick={() => setLocalData({...localData, targetClass: cName})}
+                                                            className={`px-3 py-1.5 rounded-lg text-sm font-bold border transition-all ${isActive ? 'bg-blue-600 text-white border-blue-700 shadow-inner' : 'bg-white text-blue-700 border-blue-200 hover:bg-blue-100'}`}
+                                                        >
+                                                            {cName}
+                                                        </button>
+                                                    );
+                                                })}
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+
+                            {/* 出欠入力UI */}
+                            {isAttendanceTarget && attendanceTargetClass && studentsData[attendanceTargetClass] && (
+                                <div className="shrink-0 flex flex-col space-y-1 mt-2">
+                                    <div className="flex justify-between items-end mb-1">
+                                        <label className="block text-sm font-bold text-gray-700">出欠入力 {needTargetClass ? `(${attendanceTargetClass})` : ''}</label>
+                                        <button 
+                                            onClick={() => setLocalData({ ...localData, attendance: {} })}
+                                            className="text-xs bg-green-100 text-green-700 hover:bg-green-200 px-3 py-1.5 rounded font-bold border border-green-300 transition-colors shadow-sm"
+                                        >
+                                            全員出席
+                                        </button>
+                                    </div>
+                                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 max-h-48 overflow-y-auto custom-scrollbar p-2 border border-gray-200 rounded-lg bg-gray-50">
+                                        {studentsData[attendanceTargetClass].map(st => {
+                                            const att = (localData.attendance || {})[st.id];
+                                            return (
+                                                <div key={st.id} className="flex flex-col bg-white border border-gray-200 rounded p-1.5 shadow-sm text-[10px]">
+                                                    <div className="font-bold text-gray-800 truncate mb-1">{st.id}. {st.name ? st.name.split(/[　\s]/)[0] : ''}</div>
+                                                    <div className="flex gap-1">
+                                                        <button className={`flex-1 rounded py-0.5 ${att==='absent'?'bg-red-500 text-white font-bold':'bg-gray-100 text-gray-600 hover:bg-gray-200'}`} onClick={()=>setAttendance(st.id, 'absent')}>欠</button>
+                                                        <button className={`flex-1 rounded py-0.5 ${att==='late'?'bg-yellow-500 text-white font-bold':'bg-gray-100 text-gray-600 hover:bg-gray-200'}`} onClick={()=>setAttendance(st.id, 'late')}>遅</button>
+                                                        <button className={`flex-1 rounded py-0.5 ${att==='early'?'bg-blue-500 text-white font-bold':'bg-gray-100 text-gray-600 hover:bg-gray-200'}`} onClick={()=>setAttendance(st.id, 'early')}>早</button>
+                                                    </div>
+                                                </div>
+                                            )
+                                        })}
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* 単元入力エリア（3行分） */}
                             {isClass && (
-                                <div className="shrink-0">
-                                    <label className="block text-xs font-bold text-gray-500 mb-2">クラス</label>
-                                    <ClassSelector selectedClass={localData.classId} onSelect={c => setLocalData({...localData, classId: c===localData.classId?'':c})} classes={classOptions} />
+                                <div className="shrink-0 flex flex-col space-y-1 mt-2">
+                                    <label className="block text-sm font-bold text-gray-700">単元</label>
+                                    <textarea 
+                                        className="w-full border-2 border-green-200 bg-green-50 rounded-lg p-2 resize-none focus:ring-2 focus:ring-green-400" 
+                                        rows="3" 
+                                        value={localData.unit || ''} 
+                                        onChange={e => setLocalData({...localData, unit: e.target.value})} 
+                                        placeholder="単元を入力してください..." 
+                                    />
                                 </div>
                             )}
                             
-                            <div className="flex-1 flex flex-col space-y-2 min-h-[150px]">
+                            <div className="flex-1 flex flex-col space-y-2 min-h-[100px]">
                                 <label className="block text-sm font-bold text-gray-700 shrink-0">{isClass ? '予定' : '内容'}</label>
                                 <textarea className="w-full border-2 border-gray-200 rounded-lg p-3 flex-1 resize-none focus:ring-2 focus:ring-blue-500" value={localData.plan || ''} onChange={e => setLocalData({...localData, plan: e.target.value})} placeholder="入力してください..." />
                             </div>
                             
                             {isClass && (
-                                <div className="flex-1 flex flex-col space-y-2 min-h-[150px]">
+                                <div className="flex-1 flex flex-col space-y-2 min-h-[100px]">
                                     <label className="block text-sm font-bold text-gray-700 shrink-0">実施記録・振り返り</label>
                                     <textarea className="w-full border-2 border-yellow-100 bg-yellow-50 rounded-lg p-3 flex-1 resize-none focus:ring-2 focus:ring-yellow-400" value={localData.actual || ''} onChange={e => setLocalData({...localData, actual: e.target.value})} placeholder="実施した内容や振り返りを入力してください..." />
                                 </div>
@@ -223,24 +333,26 @@
 
                         <div className="p-4 border-t bg-gray-50 flex justify-end gap-3 shrink-0 rounded-b-xl">
                             <button onClick={onClose} className="px-5 py-2.5 rounded-lg text-gray-600 hover:bg-gray-200 font-bold transition-colors">キャンセル</button>
-                            <button onClick={() => { onSave(date, slotId, localData); onClose(); }} className="px-8 py-2.5 rounded-lg bg-blue-600 text-white font-bold shadow-md hover:bg-blue-700 transition-colors">保存する</button>
+                            <button onClick={handleSaveClick} className="px-8 py-2.5 rounded-lg bg-blue-600 text-white font-bold shadow-md hover:bg-blue-700 transition-colors">保存する</button>
                         </div>
                     </div>
                 </div>
             );
         };
 
-        const SettingsModal = ({ isOpen, onClose, classes, onUpdateClasses, syncId, onUpdateSyncId, appId, onUpdateAppId, onTriggerSync, isSyncing, title, onUpdateTitle, onResetData }) => {
+        const SettingsModal = ({ isOpen, onClose, classes, onUpdateClasses, syncId, onUpdateSyncId, appId, onUpdateAppId, onTriggerSync, isSyncing, title, onUpdateTitle, onResetData, onUpdateStudents, studentsData, homeroomClass, onUpdateHomeroomClass }) => {
             if (!isOpen) return null;
             const [lClasses, setLClasses] = useState([...classes]);
             const [lSyncId, setLSyncId] = useState(syncId);
             const [lAppId, setLAppId] = useState(appId);
             const [lTitle, setLTitle] = useState(title);
+            const [lHomeroomClass, setLHomeroomClass] = useState(homeroomClass);
             const [configIn, setConfigIn] = useState('');
 
             const handleSave = () => {
-                onUpdateClasses(lClasses.filter(c => c.name.trim() !== ''));
+                onUpdateClasses(lClasses.filter(c => c.name && c.name.trim() !== ''));
                 onUpdateSyncId(lSyncId); onUpdateAppId(lAppId); onUpdateTitle(lTitle);
+                onUpdateHomeroomClass(lHomeroomClass);
                 onClose();
             };
 
@@ -256,15 +368,118 @@
                 } catch (e) { alert("解析エラー"); }
             };
 
+            const downloadTemplate = () => {
+                const header = "番号,1A,フリガナ,性別,番号,1B,フリガナ,性別,番号,2A,フリガナ,性別,番号,2B,フリガナ,性別,番号,3A,フリガナ,性別,番号,3B,フリガナ,性別\n";
+                const sample1 = "1,山田 太郎,ﾔﾏﾀﾞ ﾀﾛｳ,男,1,佐藤 花子,ｻﾄｳ ﾊﾅｺ,女,,,,,,,,,,,,,,,,\n";
+                const sample2 = "2,鈴木 次郎,ｽｽﾞｷ ｼﾞﾛｳ,男,2,高橋 美咲,ﾀｶﾊｼ ﾐｻｷ,女,,,,,,,,,,,,,,,,\n";
+                
+                const bom = new Uint8Array([0xEF, 0xBB, 0xBF]);
+                const blob = new Blob([bom, header + sample1 + sample2], { type: 'text/csv' });
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = "生徒名簿テンプレート.csv";
+                a.click();
+                window.URL.revokeObjectURL(url);
+            };
+
+            const handleCSVUpload = (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+
+                const reader = new FileReader();
+                reader.onload = (evt) => {
+                    const text = evt.target.result;
+                    const lines = text.split('\n');
+                    if (lines.length < 2) {
+                        alert("CSVデータのフォーマットが正しくありません。");
+                        return;
+                    }
+                    
+                    const header = lines[0].split(',');
+                    let classMap = {};
+                    header.forEach((col, idx) => {
+                        let val = col.trim().replace(/[Ａ-Ｚａ-ｚ０-９]/g, s => String.fromCharCode(s.charCodeAt(0) - 0xFEE0)).replace(/[^0-9A-Z]/gi, '');
+                        const match = val.match(/([1-3][AB])/i);
+                        if (match) {
+                            const cName = match[1].toUpperCase(); 
+                            classMap[cName] = idx > 0 ? idx - 1 : 0; 
+                        }
+                    });
+
+                    if (Object.keys(classMap).length === 0) {
+                        classMap = { '1A': 0, '1B': 4, '2A': 8, '2B': 12, '3A': 16, '3B': 20 };
+                    }
+
+                    const parsedStudents = {};
+                    Object.keys(classMap).forEach(k => parsedStudents[k] = []);
+
+                    for (let i = 1; i < lines.length; i++) {
+                        const cols = lines[i].split(',');
+                        Object.entries(classMap).forEach(([cName, startIdx]) => {
+                            if (cols.length > startIdx + 1) {
+                                const idStr = cols[startIdx] ? cols[startIdx].trim() : '';
+                                const name = cols[startIdx + 1] ? cols[startIdx + 1].trim() : '';
+                                if (idStr && name) {
+                                    const id = parseInt(idStr, 10);
+                                    if (!isNaN(id)) {
+                                        parsedStudents[cName].push({ id, name });
+                                    }
+                                }
+                            }
+                        });
+                    }
+                    
+                    let total = 0;
+                    Object.values(parsedStudents).forEach(list => total += list.length);
+
+                    if (total > 0) {
+                        onUpdateStudents(parsedStudents);
+                        alert(`${Object.keys(parsedStudents).length}クラス、合計${total}名の生徒データを読み込みました。\n授業枠や欠席枠で出欠入力ができるようになります。`);
+                    } else {
+                        alert("有効な生徒データが見つかりませんでした。CSVの形式を確認してください。");
+                    }
+                };
+                reader.readAsText(file, "Shift_JIS"); 
+            };
+
             return (
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
                     <div className="bg-white rounded-lg p-6 w-full max-w-lg max-h-[90vh] flex flex-col">
                         <h2 className="text-xl font-bold mb-4 flex items-center gap-2 shrink-0"><Icons.Settings/>設定</h2>
                         <div className="flex-1 overflow-y-auto space-y-6 custom-scrollbar pr-2">
-                            <div>
-                                <label className="block text-sm font-bold mb-1">担任名</label>
-                                <input type="text" className="w-full border p-2 rounded" value={lTitle || ''} onChange={e => setLTitle(e.target.value)} />
+                            
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-sm font-bold mb-1">表示名（担任名など）</label>
+                                    <input type="text" className="w-full border p-2 rounded" value={lTitle || ''} onChange={e => setLTitle(e.target.value)} />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-bold mb-1">担任クラス</label>
+                                    <select className="w-full border p-2 rounded" value={lHomeroomClass || ''} onChange={e => setLHomeroomClass(e.target.value)}>
+                                        <option value="">未設定</option>
+                                        {studentsData && Object.keys(studentsData).map(c => <option key={c} value={c}>{c}</option>)}
+                                    </select>
+                                    <p className="text-[10px] text-gray-500 mt-1">※HR等でこのクラスの名簿が自動選択されます。</p>
+                                </div>
                             </div>
+                            
+                            {/* 生徒名簿CSV読み込み・ダウンロードエリア */}
+                            <div className="bg-indigo-50 p-4 rounded-lg border border-indigo-200 space-y-3 mt-4">
+                                <h3 className="font-bold text-indigo-800 flex items-center gap-1"><Icons.Users size={16}/> 生徒名簿CSVの管理</h3>
+                                <p className="text-xs text-indigo-700 font-medium">
+                                    初めての方は、まず入力用テンプレートをダウンロードして生徒データを記入してください。<br/>
+                                    記入したCSVを読み込むと、アプリ内で「出欠・遅刻・早退」の記録ができるようになります。
+                                </p>
+                                <div className="pt-1">
+                                    <button onClick={downloadTemplate} className="mb-4 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold py-2 px-4 rounded shadow-sm transition flex items-center gap-1 w-full justify-center">
+                                        <Icons.Download size={14} /> 入力用テンプレート(CSV)をダウンロード
+                                    </button>
+                                    <label className="block text-xs font-bold text-indigo-800 mb-1">記入済みのCSVをアップロード:</label>
+                                    <input type="file" accept=".csv" onChange={handleCSVUpload} className="block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-indigo-100 file:text-indigo-700 hover:file:bg-indigo-200 cursor-pointer" />
+                                </div>
+                            </div>
+
                             <div className="bg-blue-50 p-4 rounded-lg border border-blue-100 space-y-3">
                                 <h3 className="font-bold text-blue-800 flex items-center gap-1"><Icons.Cloud size={16}/> クラウド同期</h3>
                                 <div className="flex items-center gap-2"><label className="w-16 text-xs">App ID:</label><input className="flex-1 border p-1 rounded font-mono text-sm" value={lAppId || ''} onChange={e=>setLAppId(e.target.value)}/></div>
@@ -281,7 +496,7 @@
                                 {lClasses.map((c, i) => (
                                     <div key={i} className="flex gap-2">
                                         <input className="border p-1 rounded flex-1" value={c.name} onChange={e => { const nc=[...lClasses]; nc[i].name=e.target.value; setLClasses(nc); }} />
-                                        <select className={"border p-1 rounded w-20 " + (COLOR_PALETTE[c.color]?.bgLight || "")} value={c.color} onChange={e => { const nc=[...lClasses]; nc[i].color=e.target.value; setLClasses(nc); }}>
+                                        <select className={"border p-1 rounded w-20 " + (COLOR_PALETTE[c.color] ? COLOR_PALETTE[c.color].bgLight : "")} value={c.color} onChange={e => { const nc=[...lClasses]; nc[i].color=e.target.value; setLClasses(nc); }}>
                                             {Object.keys(COLOR_PALETTE).map(k => <option key={k} value={k}>{COLOR_PALETTE[k].label}</option>)}
                                         </select>
                                         <button onClick={() => setLClasses(lClasses.filter((_,idx)=>idx!==i))} className="text-gray-400 hover:text-red-500"><Icons.Trash/></button>
@@ -343,7 +558,7 @@
                                         const dData = data[dk] || {};
                                         const isToday = formatDateKey(new Date()) === dk;
                                         const dcs = [];
-                                        ['1','2','3','4','5','6','7'].forEach(p => { if (dData[p]?.classId) dcs.push({p, id: dData[p].classId}); });
+                                        ['1','2','3','4','5','6','7'].forEach(p => { if (dData[p] && dData[p].classId) dcs.push({p, id: dData[p].classId}); });
 
                                         return (
                                             <div key={c} onClick={() => onNav(dt)} className={"border-r border-b p-1 cursor-pointer hover:bg-blue-50 flex flex-col " + (isToday ? "bg-blue-50" : "")}>
@@ -366,7 +581,7 @@
             );
         };
 
-        const ClassHistoryView = ({ data, classes }) => {
+        const ClassHistoryView = ({ data, classes, studentsData }) => {
             const [selCls, setSelCls] = useState('ALL');
             const [search, setSearch] = useState("");
             
@@ -375,14 +590,44 @@
                 Object.keys(data).sort().reverse().forEach(dk => {
                     Object.keys(data[dk] || {}).forEach(sid => {
                         const s = data[dk][sid];
-                        if (!s || (!s.plan && !s.actual)) return;
+                        if (!s || (!s.plan && !s.actual && !s.unit && (!s.attendance || Object.keys(s.attendance).length === 0))) return;
                         if (selCls !== 'ALL' && s.classId !== selCls) return;
-                        if (search && !((s.plan||'').includes(search) || (s.actual||'').includes(search))) return;
-                        list.push({ date: dk, period: TIME_SLOTS.find(t=>t.id===sid)?.label||sid, plan: s.plan, actual: s.actual, classId: s.classId });
+                        if (search && !((s.plan||'').includes(search) || (s.actual||'').includes(search) || (s.unit||'').includes(search))) return;
+                        
+                        let attStr = "";
+                        const attClass = s.targetClass || s.classId; 
+                        if (s.attendance && studentsData && studentsData[attClass]) {
+                            const absents = [], lates = [], earlys = [];
+                            Object.keys(s.attendance).forEach(stId => {
+                                const st = studentsData[attClass].find(student => student.id == stId);
+                                if (st) {
+                                    const name = st.name ? st.name.split(/[　\s]/)[0] : '';
+                                    if (s.attendance[stId] === 'absent') absents.push(name);
+                                    else if (s.attendance[stId] === 'late') lates.push(name);
+                                    else if (s.attendance[stId] === 'early') earlys.push(name);
+                                }
+                            });
+                            if(absents.length > 0) attStr += `欠: ${absents.join(', ')}\n`;
+                            if(lates.length > 0) attStr += `遅: ${lates.join(', ')}\n`;
+                            if(earlys.length > 0) attStr += `早: ${earlys.join(', ')}\n`;
+                        }
+
+                        let dispClass = s.classId;
+                        if (s.targetClass && s.targetClass !== s.classId) dispClass += `\n(${s.targetClass})`;
+
+                        let periodLabel = sid;
+                        if (sid === 'sat_memo') periodLabel = '土曜メモ';
+                        else if (sid === 'sun_memo') periodLabel = '日曜メモ';
+                        else {
+                            const t = TIME_SLOTS.find(t=>t.id===sid);
+                            if (t) periodLabel = t.label;
+                        }
+
+                        list.push({ date: dk, period: periodLabel, unit: s.unit, plan: s.plan, actual: s.actual, attStr: attStr, classId: dispClass });
                     });
                 });
                 return list;
-            }, [data, selCls, search]);
+            }, [data, selCls, search, studentsData]);
 
             return (
                 <div className="bg-white rounded shadow p-4 h-full flex flex-col">
@@ -391,7 +636,7 @@
                         <div className="flex gap-2">
                             <div className="relative">
                                 <Icons.Search className="absolute left-2 top-2.5 text-gray-400" />
-                                <input type="text" className="pl-8 border p-2 rounded" placeholder="検索..." value={search} onChange={e=>setSearch(e.target.value)} />
+                                <input type="text" className="pl-8 border p-2 rounded" placeholder="単元・予定を検索..." value={search} onChange={e=>setSearch(e.target.value)} />
                             </div>
                             <select className="border p-2 rounded" value={selCls} onChange={e=>setSelCls(e.target.value)}>
                                 <option value="ALL">全クラス</option>
@@ -401,14 +646,25 @@
                     </div>
                     <div className="flex-1 overflow-auto custom-scrollbar">
                         <table className="w-full text-left border-collapse text-sm">
-                            <thead className="bg-gray-100 sticky top-0"><tr><th className="p-3 border-b w-24">日付</th><th className="p-3 border-b text-center w-20">クラス</th><th className="p-3 border-b w-1/2">予定</th><th className="p-3 border-b w-1/2">実施記録</th></tr></thead>
+                            <thead className="bg-gray-100 sticky top-0">
+                                <tr>
+                                    <th className="p-3 border-b w-24">日付</th>
+                                    <th className="p-3 border-b text-center w-16">クラス</th>
+                                    <th className="p-3 border-b w-1/6">出欠</th>
+                                    <th className="p-3 border-b w-1/5">単元</th>
+                                    <th className="p-3 border-b w-1/4">予定</th>
+                                    <th className="p-3 border-b w-1/4">実施記録</th>
+                                </tr>
+                            </thead>
                             <tbody>
                                 {history.map((h, i) => (
                                     <tr key={i} className="border-b hover:bg-gray-50">
                                         <td className="p-3 text-gray-600">{h.date}<br/><span className="text-xs bg-gray-200 px-1 rounded">{h.period}</span></td>
-                                        <td className="p-3 font-bold text-center">{h.classId}</td>
-                                        <td className="p-3 whitespace-pre-wrap">{h.plan}</td>
-                                        <td className="p-3 whitespace-pre-wrap text-blue-800 font-medium">{h.actual}</td>
+                                        <td className="p-3 font-bold text-center whitespace-pre-wrap">{h.classId}</td>
+                                        <td className="p-3 whitespace-pre-wrap text-red-600 font-bold text-xs">{h.attStr}</td>
+                                        <td className="p-3 whitespace-pre-wrap font-bold text-blue-800">{h.unit}</td>
+                                        <td className="p-3 whitespace-pre-wrap text-gray-800">{h.plan}</td>
+                                        <td className="p-3 whitespace-pre-wrap text-orange-600 font-medium">{h.actual}</td>
                                     </tr>
                                 ))}
                             </tbody>
@@ -470,8 +726,10 @@
             const [view, setView] = useState('week'); 
             const [data, setData] = useState({}); 
             const [classes, setClasses] = useState(DEFAULT_CLASSES);
+            const [studentsData, setStudentsData] = useState({}); 
             const [title, setTitle] = useState("担任");
-            const [eventUrl, setEventUrl] = useState(''); // 行事予定表URLのステート
+            const [homeroomClass, setHomeroomClass] = useState(""); 
+            const [eventUrl, setEventUrl] = useState(''); 
             const [appId, setAppId] = useState(initialAppId);
             const [syncId, setSyncId] = useState(() => localStorage.getItem('teacherLogSyncId') || generateId());
             const [isSyncing, setIsSyncing] = useState(false);
@@ -494,10 +752,13 @@
 
                 setData(loadSafe('teachersLogData', {}, false));
                 setClasses(loadSafe('teachersLogClasses', DEFAULT_CLASSES, true));
+                setStudentsData(loadSafe('teacherLogStudentsData', {}, false));
                 const sTit = localStorage.getItem('teacherLogTitle');
                 if (sTit) setTitle(sTit);
                 const sEvent = localStorage.getItem('teacherLogEventUrl');
                 if (sEvent) setEventUrl(sEvent);
+                const sHomeroom = localStorage.getItem('teacherLogHomeroom');
+                if (sHomeroom) setHomeroomClass(sHomeroom);
             }, []);
 
             useEffect(() => {
@@ -524,8 +785,10 @@
                         const d = doc.data();
                         if(d.schedule) setData(d.schedule); 
                         if(d.classes && Array.isArray(d.classes)) setClasses(d.classes); 
+                        if(d.students && typeof d.students === 'object') setStudentsData(d.students);
                         if(d.title) setTitle(d.title);
                         if(d.eventUrl !== undefined) setEventUrl(d.eventUrl);
+                        if(d.homeroomClass !== undefined) setHomeroomClass(d.homeroomClass);
                     }
                     setIsCloudLoaded(true);
                 }, err => {
@@ -534,14 +797,13 @@
                 return () => unsub();
             }, [user, syncId, appId]);
 
-            // 保存時に eventUrl も含める
-            const saveCloud = useCallback(async (nd=data, nc=classes, nt=title, ne=eventUrl) => {
+            const saveCloud = useCallback(async (nd=data, nc=classes, nt=title, ne=eventUrl, ns=studentsData, nh=homeroomClass) => {
                 if (!useCloud || !db || !user) return false;
                 try {
-                    await db.collection('artifacts').doc(appId).collection('public').doc('data').collection('weekly_plans').doc(syncId).set({ schedule: nd||{}, classes: nc||[], title: nt||"", eventUrl: ne||"", updated: new Date().toISOString() }, { merge: true });
+                    await db.collection('artifacts').doc(appId).collection('public').doc('data').collection('weekly_plans').doc(syncId).set({ schedule: nd||{}, classes: nc||[], title: nt||"", eventUrl: ne||"", students: ns||{}, homeroomClass: nh||"", updated: new Date().toISOString() }, { merge: true });
                     return true;
                 } catch(e){ return false; }
-            }, [user, syncId, appId, data, classes, title, eventUrl]);
+            }, [user, syncId, appId, data, classes, title, eventUrl, studentsData, homeroomClass]);
 
             const triggerSync = async (tid, taid) => {
                 if (!useCloud || !db || !user) return;
@@ -553,8 +815,10 @@
                         if (confirm("クラウドデータを上書きロードしますか？")) {
                             if(d.schedule) setData(d.schedule); 
                             if(d.classes && Array.isArray(d.classes)) setClasses(d.classes); 
+                            if(d.students && typeof d.students === 'object') setStudentsData(d.students);
                             if(d.title) setTitle(d.title);
                             if(d.eventUrl !== undefined) setEventUrl(d.eventUrl);
+                            if(d.homeroomClass !== undefined) setHomeroomClass(d.homeroomClass);
                             alert("ロード完了");
                         }
                     } else {
@@ -569,7 +833,8 @@
 
             useEffect(() => { localStorage.setItem('teachersLogData', JSON.stringify(data)); }, [data]);
             useEffect(() => { localStorage.setItem('teachersLogClasses', JSON.stringify(classes)); }, [classes]);
-            useEffect(() => { localStorage.setItem('teacherLogSyncId', syncId); localStorage.setItem('teacherLogAppId', appId); localStorage.setItem('teacherLogTitle', title); localStorage.setItem('teacherLogEventUrl', eventUrl); }, [syncId, appId, title, eventUrl]);
+            useEffect(() => { localStorage.setItem('teacherLogStudentsData', JSON.stringify(studentsData)); }, [studentsData]);
+            useEffect(() => { localStorage.setItem('teacherLogSyncId', syncId); localStorage.setItem('teacherLogAppId', appId); localStorage.setItem('teacherLogTitle', title); localStorage.setItem('teacherLogEventUrl', eventUrl); localStorage.setItem('teacherLogHomeroom', homeroomClass); }, [syncId, appId, title, eventUrl, homeroomClass]);
 
             const mon = getMonday(date);
             const wNum = Math.ceil(mon.getDate() / 7); 
@@ -577,26 +842,24 @@
             
             const handleSaveSlot = (dk, sid, nd) => {
                 const upd = { ...data, [dk]: { ...(data[dk]||{}), [sid]: nd } };
-                setData(upd); if (isCloudLoaded) saveCloud(upd, classes, title, eventUrl);
+                setData(upd); if (isCloudLoaded) saveCloud(upd, classes, title, eventUrl, studentsData, homeroomClass);
             };
 
             const downloadBackup = () => {
                 const a = document.createElement('a');
-                // バックアップにも eventUrl を追加
-                a.href = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify({ schedule: data, classes: classes, title: title, eventUrl: eventUrl }));
+                a.href = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify({ schedule: data, classes: classes, title: title, eventUrl: eventUrl, students: studentsData, homeroomClass: homeroomClass }));
                 a.download = "backup_" + formatDateKey(new Date()) + ".json";
                 a.click();
             };
 
-            // ========== 年度リセットの処理 ==========
             const handleResetData = () => {
                 const msg1 = "【警告】すべての予定と実施記録を消去します。\n\n※事前に「↓」ボタンからバックアップ（ダウンロード）を取りましたか？\nバックアップを取っていない場合は「キャンセル」を押してください。";
                 if (window.confirm(msg1)) {
                     const msg2 = "本当にすべての記録を消去します。この操作は元に戻せません。\nよろしいですか？";
                     if (window.confirm(msg2)) {
                         setData({});
-                        setEventUrl(''); // リセット時は行事予定表のURLもクリア
-                        if (isCloudLoaded) saveCloud({}, classes, title, '');
+                        setEventUrl(''); 
+                        if (isCloudLoaded) saveCloud({}, classes, title, '', studentsData, homeroomClass);
                         alert("すべての記録を消去しました。新しい年度の準備が完了しました。");
                     }
                 }
@@ -612,9 +875,11 @@
                         const p = JSON.parse(ex.target.result);
                         if(p.schedule) setData(p.schedule); 
                         if(p.classes && Array.isArray(p.classes)) setClasses(p.classes); 
+                        if(p.students && typeof p.students === 'object') setStudentsData(p.students);
                         if(p.title) setTitle(p.title);
                         if(p.eventUrl !== undefined) setEventUrl(p.eventUrl);
-                        if(isCloudLoaded) saveCloud(p.schedule, p.classes, p.title, p.eventUrl || '');
+                        if(p.homeroomClass !== undefined) setHomeroomClass(p.homeroomClass);
+                        if(isCloudLoaded) saveCloud(p.schedule, p.classes, p.title, p.eventUrl || '', p.students || {}, p.homeroomClass || '');
                         alert("データを安全に復元しました。");
                     } catch (error) {
                         alert("復元に失敗しました。ファイルが壊れている可能性があります。");
@@ -630,12 +895,66 @@
                 
                 let bg = 'bg-white';
                 if (slot.id === 'lunch') bg = 'bg-gray-100 items-center justify-center text-gray-400';
-                else if (slot.id === 'todo') bg = 'bg-red-50'; else if (slot.id === 'collection') bg = 'bg-blue-50'; else if (slot.id === 'morning') bg = 'bg-yellow-50'; else if (['after','memo'].includes(slot.id)) bg = 'bg-orange-50';
+                else if (slot.id === 'todo') bg = 'bg-red-50'; else if (slot.id === 'collection') bg = 'bg-blue-50'; else if (slot.id === 'absence') bg = 'bg-pink-50'; else if (slot.id === 'morning') bg = 'bg-yellow-50'; else if (['after','memo'].includes(slot.id)) bg = 'bg-orange-50';
                 
+                const isAttendanceTarget = slot.type === 'class' || slot.id === 'absence';
+                const isClass = slot.type === 'class';
+
+                const att = sd.attendance || {};
+                const attKeys = Object.keys(att);
+                let attDisplay = null;
+                
+                let resolvedAttClass = sd.classId;
+                if (sd.classId && (!studentsData || !studentsData[sd.classId])) {
+                    if (sd.targetClass && studentsData[sd.targetClass]) resolvedAttClass = sd.targetClass;
+                    else if (!sd.targetClass && homeroomClass && studentsData[homeroomClass]) resolvedAttClass = homeroomClass;
+                }
+                
+                if (attKeys.length > 0 && studentsData && studentsData[resolvedAttClass]) {
+                    const absents = [], lates = [], earlys = [];
+                    attKeys.forEach(sid => {
+                        const st = studentsData[resolvedAttClass].find(s => s.id == sid);
+                        if (st) {
+                            const name = st.name ? st.name.split(/[　\s]/)[0] : '';
+                            if (att[sid] === 'absent') absents.push(name);
+                            else if (att[sid] === 'late') lates.push(name);
+                            else if (att[sid] === 'early') earlys.push(name);
+                        }
+                    });
+                    attDisplay = (
+                        <div className="text-[9px] leading-tight mb-0.5 border-b border-gray-200 pb-0.5 font-medium">
+                            {absents.length > 0 && <div className="text-red-600">欠: {absents.join(', ')}</div>}
+                            {lates.length > 0 && <div className="text-yellow-600">遅: {lates.join(', ')}</div>}
+                            {earlys.length > 0 && <div className="text-blue-600">早: {earlys.join(', ')}</div>}
+                        </div>
+                    );
+                }
+
                 return (
-                    <div className={"border-b border-r border-gray-200 p-1 text-xs relative cursor-pointer hover:bg-blue-50 transition-colors group print-row overflow-hidden flex flex-col " + slot.height + " " + bg} onClick={() => setModal({isOpen:true, date:dateKey, slotId:slot.id})}>
-                        {slot.type === 'class' && sd.classId && <span className={"font-bold mb-1 text-[10px] self-start px-1.5 py-0.5 rounded print-border " + th.bgLight + " " + th.text}>{sd.classId}</span>}
-                        <div className="whitespace-pre-wrap leading-tight text-gray-700">{(!sd.plan && sd.actual) && <span className="text-orange-500 font-bold">[実] </span>}{sd.plan || sd.actual || ''}</div>
+                    <div className={"border-b border-r border-gray-200 p-1 relative cursor-pointer hover:bg-blue-50 transition-colors group overflow-hidden flex flex-col print:border-black print-row " + slot.height + " " + bg} onClick={() => setModal({isOpen:true, date:dateKey, slotId:slot.id})}>
+                        {isAttendanceTarget && sd.classId && (
+                            <div className="flex flex-wrap gap-1 mb-0.5">
+                                <span className={"font-bold text-[10px] self-start px-1.5 py-0.5 rounded print-border " + th.bgLight + " " + th.text}>{sd.classId}</span>
+                                {sd.targetClass && sd.targetClass !== sd.classId && <span className="font-bold text-[9px] self-start px-1 py-0.5 rounded bg-blue-100 text-blue-800 print-border border border-blue-200">({sd.targetClass})</span>}
+                            </div>
+                        )}
+                        
+                        <div className="flex-1 overflow-hidden text-[10px] sm:text-xs leading-[1.15] whitespace-pre-wrap flex flex-col">
+                            {attDisplay}
+                            
+                            {isClass ? (
+                                <React.Fragment>
+                                    {sd.unit && <div className="font-bold text-blue-800 mb-0.5">{sd.unit}</div>}
+                                    {sd.plan && <div className="text-gray-800 mb-0.5">{sd.plan}</div>}
+                                    {sd.actual && <div className="text-orange-600"><span className="font-bold">[実]</span> {sd.actual}</div>}
+                                </React.Fragment>
+                            ) : (
+                                <div className="text-gray-700">
+                                    {(!sd.plan && sd.actual) && <span className="text-orange-500 font-bold">[実] </span>}
+                                    {sd.plan || sd.actual || ''}
+                                </div>
+                            )}
+                        </div>
                     </div>
                 );
             };
@@ -651,7 +970,6 @@
                             </div>
                         </div>
                         <div className="flex bg-gray-100 p-1 rounded-lg overflow-x-auto custom-scrollbar">
-                            {/* 新しい「行事予定」タブを追加 */}
                             {[{id:'month',l:'月'},{id:'week',l:'週'},{id:'events',l:'行事予定'},{id:'history',l:'履歴'},{id:'stats',l:'集計'}].map(m => (
                                 <button key={m.id} onClick={()=>setView(m.id)} className={"px-2 md:px-4 py-1.5 text-xs md:text-sm font-bold rounded transition whitespace-nowrap " + (view===m.id ? "bg-white shadow text-blue-600":"text-gray-500 hover:text-gray-800")}>{m.l}</button>
                             ))}
@@ -665,7 +983,6 @@
                     </header>
 
                     <main className="flex-1 flex flex-col overflow-hidden print:overflow-visible">
-                        {/* 行事予定タブ以外のときに日付コントロールを表示 */}
                         {view !== 'events' && (
                             <div className="bg-white border-b px-6 py-2 flex justify-between items-center shrink-0 no-print">
                                 <div className="flex items-center gap-4">
@@ -680,35 +997,85 @@
                         <div className="flex-1 overflow-hidden print:overflow-visible">
                             {view === 'week' && (
                                 <div className="h-full overflow-auto custom-scrollbar p-4 print:p-0 print:overflow-visible">
-                                    <div className="bg-white shadow rounded border min-w-[800px] print:shadow-none print:min-w-0 print:border-black">
-                                        <div className="grid grid-cols-[80px_repeat(6,1fr)] bg-gray-50 border-b print:bg-white print:border-black">
-                                            <div className="p-3 text-center text-xs font-bold text-gray-500 border-r">時限</div>
-                                            {wDates.map((d, i) => {
-                                                const isT = d.toDateString() === new Date().toDateString();
+                                    <div className="bg-white shadow rounded border min-w-[800px] print:shadow-none print:min-w-0 print:border-black overflow-hidden">
+                                        <div className="grid grid-cols-[80px_repeat(6,1fr)] bg-white print:bg-white">
+                                            {/* Header */}
+                                            <div className="contents">
+                                                <div className="p-3 text-center text-xs font-bold text-gray-500 border-b border-r bg-gray-50 print:border-black">時限</div>
+                                                {wDates.map((d, i) => {
+                                                    const isT = d.toDateString() === new Date().toDateString();
+                                                    return (
+                                                        <div key={i} className={"p-2 text-center border-b border-r print:border-black " + (isT ? "bg-blue-50" : "bg-gray-50")}>
+                                                            <div className="text-xs text-gray-500">{WEEK_DAYS[i]}</div>
+                                                            <div className={"text-lg font-bold " + (i === 5 ? "text-blue-600" : "text-gray-800")}>{d.getDate()}</div>
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                            
+                                            {/* Body */}
+                                            {TIME_SLOTS.map(slot => {
+                                                let lb = 'bg-gray-50';
+                                                if(slot.id==='lunch') lb='bg-gray-100'; else if(['todo','collection','absence','morning'].includes(slot.id)) lb='bg-yellow-100'; else if(['after','memo'].includes(slot.id)) lb='bg-orange-100';
+                                                
                                                 return (
-                                                    <div key={i} className={"p-2 text-center border-r last:border-r-0 " + (isT?"bg-blue-50":"")}>
-                                                        <div className="text-xs text-gray-500">{WEEK_DAYS[i]}</div>
-                                                        <div className={"text-lg font-bold " + (i===5?"text-blue-600":"text-gray-800")}>{d.getDate()}</div>
-                                                    </div>
+                                                    <React.Fragment key={slot.id}>
+                                                        <div className={"border-b border-r flex items-center justify-center text-xs font-bold text-gray-600 print:border-black print-row " + lb}>
+                                                            {slot.label}
+                                                        </div>
+                                                        {wDates.map((d, i) => {
+                                                            if (i === 5) {
+                                                                if (slot.id === 'lunch') {
+                                                                    const satKey = formatDateKey(d);
+                                                                    const sunDate = new Date(mon); sunDate.setDate(mon.getDate() + 6);
+                                                                    const sunKey = formatDateKey(sunDate);
+                                                                    
+                                                                    const satMemoObj = data[satKey] && data[satKey]['sat_memo'] ? data[satKey]['sat_memo'] : {};
+                                                                    const satMemoStr = satMemoObj.plan || '';
+                                                                    
+                                                                    const sunMemoObj = data[sunKey] && data[sunKey]['sun_memo'] ? data[sunKey]['sun_memo'] : {};
+                                                                    const sunMemoStr = sunMemoObj.plan || '';
+                                                                    
+                                                                    const sunMonth = sunDate.getMonth() + 1;
+                                                                    const sunDay = sunDate.getDate();
+                                                                    const sunLabel = "日曜 (" + sunMonth + "/" + sunDay + ")";
+
+                                                                    return (
+                                                                        <div key={i} className="row-span-6 border-b border-r border-gray-200 bg-gray-50 flex flex-col print:border-black print-row">
+                                                                            <div 
+                                                                                className="flex-1 flex flex-col p-2 border-b border-gray-200 cursor-pointer hover:bg-blue-50 transition-colors"
+                                                                                onClick={() => setModal({ isOpen: true, date: satKey, slotId: 'sat_memo' })}
+                                                                            >
+                                                                                <div className="text-xs font-bold text-blue-700 mb-1">土曜メモ</div>
+                                                                                <div className="flex-1 overflow-hidden text-[10px] text-gray-700 whitespace-pre-wrap">{satMemoStr}</div>
+                                                                            </div>
+                                                                            <div 
+                                                                                className="flex-1 flex flex-col p-2 cursor-pointer hover:bg-red-50 transition-colors"
+                                                                                onClick={() => setModal({ isOpen: true, date: sunKey, slotId: 'sun_memo' })}
+                                                                            >
+                                                                                <div className="text-xs font-bold text-red-600 mb-1">{sunLabel}</div>
+                                                                                <div className="flex-1 overflow-hidden text-[10px] text-gray-700 whitespace-pre-wrap">{sunMemoStr}</div>
+                                                                            </div>
+                                                                        </div>
+                                                                    );
+                                                                }
+                                                                if (['5', '6', '7', 'after', 'memo'].includes(slot.id)) {
+                                                                    return null;
+                                                                }
+                                                            }
+                                                            return (
+                                                                <SlotCell key={i} dateKey={formatDateKey(d)} slot={slot} />
+                                                            );
+                                                        })}
+                                                    </React.Fragment>
                                                 );
                                             })}
                                         </div>
-                                        {TIME_SLOTS.map(slot => {
-                                            let lb = 'bg-gray-50';
-                                            if(slot.id==='lunch') lb='bg-gray-100'; else if(['todo','collection','morning'].includes(slot.id)) lb='bg-yellow-100'; else if(['after','memo'].includes(slot.id)) lb='bg-orange-100';
-                                            return (
-                                                <div key={slot.id} className="grid grid-cols-[80px_repeat(6,1fr)] hover:bg-gray-50 print-row">
-                                                    <div className={"border-b border-r flex items-center justify-center text-xs font-bold text-gray-600 " + lb}>{slot.label}</div>
-                                                    {wDates.map((d, i) => <div key={i} className="print-border"><SlotCell dateKey={formatDateKey(d)} slot={slot} /></div>)}
-                                                </div>
-                                            );
-                                        })}
                                     </div>
                                 </div>
                             )}
                             {view === 'month' && <MonthView date={date} data={data} onNav={d=>{setDate(d);setView('week');}} classes={classes} />}
                             
-                            {/* 追加された「行事予定表」タブの中身 */}
                             {view === 'events' && (
                                 <div className="h-full p-4 flex flex-col">
                                     <div className="bg-white rounded-lg shadow border flex-1 flex flex-col overflow-hidden">
@@ -716,7 +1083,7 @@
                                             <h2 className="text-lg font-bold flex items-center gap-2"><Icons.FileText /> 行事予定表</h2>
                                             {eventUrl && (
                                                 <button 
-                                                    onClick={() => { setEventUrl(''); if(isCloudLoaded) saveCloud(data, classes, title, ''); }} 
+                                                    onClick={() => { setEventUrl(''); if(isCloudLoaded) saveCloud(data, classes, title, '', studentsData, homeroomClass); }} 
                                                     className="text-xs bg-red-100 text-red-600 px-3 py-1.5 rounded font-bold hover:bg-red-200 transition-colors"
                                                 >
                                                     URLを解除
@@ -745,13 +1112,12 @@
                                                             onClick={() => {
                                                                 const val = document.getElementById('eventUrlInput').value;
                                                                 if(val) {
-                                                                    // Googleドライブのリンクを自動でプレビュー用に変換する処理
                                                                     let finalUrl = val;
                                                                     if (finalUrl.includes('drive.google.com/file/d/')) {
                                                                         finalUrl = finalUrl.replace('/view?usp=sharing', '/preview').replace('/view', '/preview');
                                                                     }
                                                                     setEventUrl(finalUrl);
-                                                                    if (isCloudLoaded) saveCloud(data, classes, title, finalUrl);
+                                                                    if (isCloudLoaded) saveCloud(data, classes, title, finalUrl, studentsData, homeroomClass);
                                                                 }
                                                             }}
                                                             className="bg-blue-600 text-white font-bold px-4 py-2 rounded shadow hover:bg-blue-700 whitespace-nowrap transition-colors"
@@ -775,13 +1141,13 @@
                                 </div>
                             )}
 
-                            {view === 'history' && <div className="h-full p-4"><ClassHistoryView data={data} classes={classes} /></div>}
+                            {view === 'history' && <div className="h-full p-4"><ClassHistoryView data={data} classes={classes} studentsData={studentsData} /></div>}
                             {view === 'stats' && <div className="h-full p-4"><StatsView data={data} classes={classes} date={date} /></div>}
                         </div>
                     </main>
 
-                    <SlotModal isOpen={modal.isOpen} onClose={()=>setModal({...modal, isOpen:false})} date={modal.date} slotId={modal.slotId} data={(data[modal.date]||{})[modal.slotId]} onSave={handleSaveSlot} classOptions={classes} />
-                    <SettingsModal isOpen={isSettingsOpen} onClose={()=>setSettingsOpen(false)} classes={classes} onUpdateClasses={c=>{setClasses(c); if(isCloudLoaded)saveCloud(data,c,title,eventUrl);}} syncId={syncId} onUpdateSyncId={setSyncId} appId={appId} onUpdateAppId={setAppId} onTriggerSync={triggerSync} isSyncing={isSyncing} title={title} onUpdateTitle={t=>{setTitle(t); if(isCloudLoaded)saveCloud(data,classes,t,eventUrl);}} onResetData={handleResetData} />
+                    <SlotModal isOpen={modal.isOpen} onClose={()=>setModal({...modal, isOpen:false})} date={modal.date} slotId={modal.slotId} data={(data[modal.date]||{})[modal.slotId]} onSave={handleSaveSlot} classOptions={classes} studentsData={studentsData} homeroomClass={homeroomClass} />
+                    <SettingsModal isOpen={isSettingsOpen} onClose={()=>setSettingsOpen(false)} classes={classes} onUpdateClasses={c=>{setClasses(c); if(isCloudLoaded)saveCloud(data,c,title,eventUrl,studentsData,homeroomClass);}} syncId={syncId} onUpdateSyncId={setSyncId} appId={appId} onUpdateAppId={setAppId} onTriggerSync={triggerSync} isSyncing={isSyncing} title={title} onUpdateTitle={t=>{setTitle(t); if(isCloudLoaded)saveCloud(data,classes,t,eventUrl,studentsData,homeroomClass);}} onResetData={handleResetData} onUpdateStudents={s=>{setStudentsData(s); if(isCloudLoaded)saveCloud(data,classes,title,eventUrl,s,homeroomClass);}} studentsData={studentsData} homeroomClass={homeroomClass} onUpdateHomeroomClass={h=>{setHomeroomClass(h); if(isCloudLoaded)saveCloud(data,classes,title,eventUrl,studentsData,h);}} />
                 </div>
             );
         };
