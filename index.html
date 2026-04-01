@@ -5,17 +5,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Teacher's Log Pro</title>
     
-    <!-- React & ReactDOM -->
     <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
     
-    <!-- Babel -->
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     
-    <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     
-    <!-- Firebase SDKs -->
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
@@ -68,7 +64,7 @@
         }
 
         const { useState, useEffect, useMemo, useCallback, Component } = React;
-        const APP_VERSION = "6.1.6"; // ポップアップUI改善版
+        const APP_VERSION = "6.1.7"; // 年度更新・データリセット機能追加版
 
         class ErrorBoundary extends Component {
             constructor(props) { super(props); this.state = { hasError: false, error: null }; }
@@ -185,7 +181,6 @@
             );
         };
 
-        // ========== 変更点：入力モーダルを大きく、入力欄を広げる処理 ==========
         const SlotModal = ({ isOpen, onClose, date, slotId, data, onSave, classOptions }) => {
             if (!isOpen) return null;
             const slotDef = TIME_SLOTS.find(s => s.id === slotId);
@@ -198,14 +193,12 @@
 
             return (
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 md:p-6">
-                    {/* 横幅を max-w-2xl(広め) にし、高さを 90vh (画面の9割) に拡大 */}
                     <div className="bg-white rounded-xl w-full max-w-2xl shadow-2xl flex flex-col h-[90vh]">
                         <div className="p-4 border-b bg-gray-800 text-white flex justify-between items-center shrink-0 rounded-t-xl">
                             <div><h2 className="text-lg font-bold">{dStr}</h2><span className="text-sm bg-gray-700 px-2 py-0.5 rounded">{slotDef?.label}</span></div>
                             <button onClick={onClose} className="p-2 hover:bg-gray-700 rounded-full transition-colors"><Icons.X /></button>
                         </div>
                         
-                        {/* フレックスを使って、テキストエリアが余った高さを限界まで埋めるように設計 */}
                         <div className="p-5 overflow-y-auto flex-1 flex flex-col gap-4 custom-scrollbar">
                             {isClass && (
                                 <div className="shrink-0">
@@ -216,14 +209,12 @@
                             
                             <div className="flex-1 flex flex-col space-y-2 min-h-[150px]">
                                 <label className="block text-sm font-bold text-gray-700 shrink-0">{isClass ? '予定' : '内容'}</label>
-                                {/* flex-1 と resize-none を追加して、自動で枠いっぱいに広がるように */}
                                 <textarea className="w-full border-2 border-gray-200 rounded-lg p-3 flex-1 resize-none focus:ring-2 focus:ring-blue-500" value={localData.plan || ''} onChange={e => setLocalData({...localData, plan: e.target.value})} placeholder="入力してください..." />
                             </div>
                             
                             {isClass && (
                                 <div className="flex-1 flex flex-col space-y-2 min-h-[150px]">
                                     <label className="block text-sm font-bold text-gray-700 shrink-0">実施記録・振り返り</label>
-                                    {/* 予定と同じく枠いっぱいに広がるように */}
                                     <textarea className="w-full border-2 border-yellow-100 bg-yellow-50 rounded-lg p-3 flex-1 resize-none focus:ring-2 focus:ring-yellow-400" value={localData.actual || ''} onChange={e => setLocalData({...localData, actual: e.target.value})} placeholder="実施した内容や振り返りを入力してください..." />
                                 </div>
                             )}
@@ -237,9 +228,8 @@
                 </div>
             );
         };
-        // =========================================================================
 
-        const SettingsModal = ({ isOpen, onClose, classes, onUpdateClasses, syncId, onUpdateSyncId, appId, onUpdateAppId, onTriggerSync, isSyncing, title, onUpdateTitle }) => {
+        const SettingsModal = ({ isOpen, onClose, classes, onUpdateClasses, syncId, onUpdateSyncId, appId, onUpdateAppId, onTriggerSync, isSyncing, title, onUpdateTitle, onResetData }) => {
             if (!isOpen) return null;
             const [lClasses, setLClasses] = useState([...classes]);
             const [lSyncId, setLSyncId] = useState(syncId);
@@ -296,6 +286,15 @@
                                         <button onClick={() => setLClasses(lClasses.filter((_,idx)=>idx!==i))} className="text-gray-400 hover:text-red-500"><Icons.Trash/></button>
                                     </div>
                                 ))}
+                            </div>
+
+                            {/* データリセット（年度更新）エリア */}
+                            <div className="bg-red-50 p-4 rounded-lg border border-red-200 space-y-2 mt-6">
+                                <h3 className="font-bold text-red-800 flex items-center gap-1"><Icons.Trash size={16}/> 年度更新・データリセット</h3>
+                                <p className="text-xs text-red-700 font-medium">※すべての予定と実施記録を完全に消去します。<br/>（クラス設定や担任名はそのまま残ります）</p>
+                                <button onClick={() => { onClose(); onResetData(); }} className="w-full bg-red-600 text-white font-bold py-2 rounded hover:bg-red-700 transition shadow-sm">
+                                    すべての記録を消去する
+                                </button>
                             </div>
                         </div>
                         <div className="flex justify-end gap-2 mt-4 pt-4 border-t shrink-0">
@@ -581,6 +580,19 @@
                 a.click();
             };
 
+            // ========== 年度リセットの処理 ==========
+            const handleResetData = () => {
+                const msg1 = "【警告】すべての予定と実施記録を消去します。\n\n※事前に「↓」ボタンからバックアップ（ダウンロード）を取りましたか？\nバックアップを取っていない場合は「キャンセル」を押してください。";
+                if (window.confirm(msg1)) {
+                    const msg2 = "本当にすべての記録を消去します。この操作は元に戻せません。\nよろしいですか？";
+                    if (window.confirm(msg2)) {
+                        setData({});
+                        if (isCloudLoaded) saveCloud({}, classes, title);
+                        alert("すべての記録を消去しました。新しい年度の準備が完了しました。");
+                    }
+                }
+            };
+
             const uploadBackup = (e) => {
                 const file = e.target.files[0];
                 if (!file) return;
@@ -687,7 +699,7 @@
                     </main>
 
                     <SlotModal isOpen={modal.isOpen} onClose={()=>setModal({...modal, isOpen:false})} date={modal.date} slotId={modal.slotId} data={(data[modal.date]||{})[modal.slotId]} onSave={handleSaveSlot} classOptions={classes} />
-                    <SettingsModal isOpen={isSettingsOpen} onClose={()=>setSettingsOpen(false)} classes={classes} onUpdateClasses={c=>{setClasses(c); if(isCloudLoaded)saveCloud(data,c,title);}} syncId={syncId} onUpdateSyncId={setSyncId} appId={appId} onUpdateAppId={setAppId} onTriggerSync={triggerSync} isSyncing={isSyncing} title={title} onUpdateTitle={t=>{setTitle(t); if(isCloudLoaded)saveCloud(data,classes,t);}} />
+                    <SettingsModal isOpen={isSettingsOpen} onClose={()=>setSettingsOpen(false)} classes={classes} onUpdateClasses={c=>{setClasses(c); if(isCloudLoaded)saveCloud(data,c,title);}} syncId={syncId} onUpdateSyncId={setSyncId} appId={appId} onUpdateAppId={setAppId} onTriggerSync={triggerSync} isSyncing={isSyncing} title={title} onUpdateTitle={t=>{setTitle(t); if(isCloudLoaded)saveCloud(data,classes,t);}} onResetData={handleResetData} />
                 </div>
             );
         };
