@@ -64,7 +64,7 @@
         }
 
         const { useState, useEffect, useMemo, useCallback, Component } = React;
-        const APP_VERSION = "6.8.2"; // 全員出席ボタン改良・表示追加版
+        const APP_VERSION = "6.9.0"; // 枠の高さドラッグ調整機能追加版
 
         class ErrorBoundary extends Component {
             constructor(props) { super(props); this.state = { hasError: false, error: null }; }
@@ -105,21 +105,38 @@
         ];
 
         const TIME_SLOTS = [
-            { id: 'todo', label: 'Todo', type: 'memo', height: 'h-16' },       
-            { id: 'collection', label: '回収物', type: 'memo', height: 'h-16' }, 
-            { id: 'absence', label: '欠席', type: 'memo', height: 'h-16' },
-            { id: 'morning', label: '朝・行事', type: 'special', height: 'h-20' },
-            { id: '1', label: '1限', type: 'class', height: 'h-28' }, 
-            { id: '2', label: '2限', type: 'class', height: 'h-28' },
-            { id: '3', label: '3限', type: 'class', height: 'h-28' },
-            { id: '4', label: '4限', type: 'class', height: 'h-28' },
-            { id: 'lunch', label: '昼休み', type: 'break', height: 'h-8' },
-            { id: '5', label: '5限', type: 'class', height: 'h-28' },
-            { id: '6', label: '6限', type: 'class', height: 'h-28' },
-            { id: '7', label: '7限', type: 'class', height: 'h-28' },
-            { id: 'after', label: '帰りHR', type: 'special', height: 'h-14' },
-            { id: 'memo', label: 'メモ', type: 'memo', height: 'h-20' }
+            { id: 'todo', label: 'Todo', type: 'memo' },       
+            { id: 'collection', label: '回収物', type: 'memo' }, 
+            { id: 'absence', label: '欠席', type: 'memo' },
+            { id: 'morning', label: '朝・行事', type: 'special' },
+            { id: '1', label: '1限', type: 'class' }, 
+            { id: '2', label: '2限', type: 'class' },
+            { id: '3', label: '3限', type: 'class' },
+            { id: '4', label: '4限', type: 'class' },
+            { id: 'lunch', label: '昼休み', type: 'break' },
+            { id: '5', label: '5限', type: 'class' },
+            { id: '6', label: '6限', type: 'class' },
+            { id: '7', label: '7限', type: 'class' },
+            { id: 'after', label: '帰りHR', type: 'special' },
+            { id: 'memo', label: 'メモ', type: 'memo' }
         ];
+
+        const DEFAULT_HEIGHTS = {
+            'todo': 64,
+            'collection': 64,
+            'absence': 64,
+            'morning': 80,
+            '1': 112,
+            '2': 112,
+            '3': 112,
+            '4': 112,
+            'lunch': 32,
+            '5': 112,
+            '6': 112,
+            '7': 112,
+            'after': 56,
+            'memo': 80
+        };
 
         const getMonday = (d) => {
             const nd = new Date(d);
@@ -194,7 +211,6 @@
             const isClass = slotDef && slotDef.type === 'class';
             const isAttendanceTarget = isClass || slotId === 'absence';
             
-            // localDataに allPresent 状態を追加
             const [localData, setLocalData] = useState(data || { plan: '', actual: '', classId: '', targetClass: '', memo: '', unit: '', attendance: {}, allPresent: false });
 
             useEffect(() => { 
@@ -210,7 +226,6 @@
                 } else {
                     newAtt[sId] = status;
                 }
-                // 個別の出欠をつけたら全員出席は自動的に解除される
                 setLocalData({ ...localData, attendance: newAtt, allPresent: false });
             };
 
@@ -218,7 +233,6 @@
                 setLocalData(prev => ({
                     ...prev,
                     allPresent: !prev.allPresent,
-                    // 全員出席をオンにしたら個別の出欠はリセットする
                     attendance: !prev.allPresent ? {} : prev.attendance
                 }));
             };
@@ -280,7 +294,6 @@
                                 </div>
                             )}
 
-                            {/* 出欠入力UI */}
                             {isAttendanceTarget && attendanceTargetClass && studentsData[attendanceTargetClass] && (
                                 <div className="shrink-0 flex flex-col space-y-1 mt-2">
                                     <div className="flex justify-between items-end mb-1">
@@ -310,7 +323,6 @@
                                 </div>
                             )}
 
-                            {/* 単元入力エリア */}
                             {isClass && (
                                 <div className="shrink-0 flex flex-col space-y-1 mt-2">
                                     <label className="block text-sm font-bold text-gray-700">単元</label>
@@ -346,7 +358,7 @@
             );
         };
 
-        const SettingsModal = ({ isOpen, onClose, classes, onUpdateClasses, syncId, onUpdateSyncId, appId, onUpdateAppId, onTriggerSync, isSyncing, title, onUpdateTitle, onResetData, onUpdateStudents, studentsData, homeroomClass, onUpdateHomeroomClass }) => {
+        const SettingsModal = ({ isOpen, onClose, classes, onUpdateClasses, syncId, onUpdateSyncId, appId, onUpdateAppId, onTriggerSync, isSyncing, title, onUpdateTitle, onResetData, onUpdateStudents, studentsData, homeroomClass, onUpdateHomeroomClass, onResetHeights }) => {
             if (!isOpen) return null;
             const [lClasses, setLClasses] = useState([...classes]);
             const [lSyncId, setLSyncId] = useState(syncId);
@@ -491,11 +503,16 @@
                                 <div className="flex items-center gap-2"><label className="w-16 text-xs">Sync ID:</label><input className="flex-1 border p-1 rounded font-mono text-sm font-bold" value={lSyncId || ''} onChange={e=>setLSyncId(e.target.value)}/></div>
                                 <button onClick={() => onTriggerSync(lSyncId, lAppId)} disabled={isSyncing} className="w-full bg-green-600 text-white font-bold py-2 rounded flex justify-center items-center gap-1 hover:bg-green-700 disabled:bg-gray-400"><Icons.Wifi size={16}/>同期</button>
                             </div>
+
+                            {/* 高さリセットボタン */}
                             <div className="bg-gray-100 p-4 rounded-lg border border-gray-200 space-y-2">
-                                <h3 className="font-bold text-gray-700 flex items-center gap-1"><Icons.Database size={16}/> Firebase</h3>
-                                <textarea className="w-full border rounded p-2 text-xs font-mono h-16" placeholder="const config = {...}" value={configIn} onChange={e=>setConfigIn(e.target.value)} />
-                                <button onClick={parseConfig} className="w-full bg-gray-600 text-white text-xs py-1 rounded">更新してリロード</button>
+                                <h3 className="font-bold text-gray-700 flex items-center gap-1">外観・その他</h3>
+                                <p className="text-xs text-gray-600">マウスドラッグで変更した枠の高さを元に戻します。</p>
+                                <button onClick={onResetHeights} className="w-full bg-gray-300 text-gray-800 font-bold py-1.5 rounded hover:bg-gray-400 transition shadow-sm text-xs">
+                                    時間枠の高さ(縦幅)を初期設定に戻す
+                                </button>
                             </div>
+
                             <div className="space-y-2">
                                 <div className="flex justify-between items-center"><label className="font-bold text-sm">クラス設定</label><button onClick={() => setLClasses([...lClasses, {name:'', color:'gray'}])} className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded font-bold">+ 追加</button></div>
                                 {lClasses.map((c, i) => (
@@ -745,6 +762,15 @@
             const [isSettingsOpen, setSettingsOpen] = useState(false);
             const [user, setUser] = useState(null);
 
+            // 追加：高さのステート
+            const [slotHeights, setSlotHeights] = useState(() => {
+                const saved = localStorage.getItem('teacherLogHeights');
+                if (saved) {
+                    try { return JSON.parse(saved); } catch(e) {}
+                }
+                return DEFAULT_HEIGHTS;
+            });
+
             useEffect(() => {
                 const loadSafe = (key, defaultVal, isArray) => {
                     const str = localStorage.getItem(key);
@@ -796,6 +822,7 @@
                         if(d.title) setTitle(d.title);
                         if(d.eventUrl !== undefined) setEventUrl(d.eventUrl);
                         if(d.homeroomClass !== undefined) setHomeroomClass(d.homeroomClass);
+                        if(d.heights && typeof d.heights === 'object') setSlotHeights(d.heights);
                     }
                     setIsCloudLoaded(true);
                 }, err => {
@@ -804,13 +831,13 @@
                 return () => unsub();
             }, [user, syncId, appId]);
 
-            const saveCloud = useCallback(async (nd=data, nc=classes, nt=title, ne=eventUrl, ns=studentsData, nh=homeroomClass) => {
+            const saveCloud = useCallback(async (nd=data, nc=classes, nt=title, ne=eventUrl, ns=studentsData, nh=homeroomClass, nHeights=slotHeights) => {
                 if (!useCloud || !db || !user) return false;
                 try {
-                    await db.collection('artifacts').doc(appId).collection('public').doc('data').collection('weekly_plans').doc(syncId).set({ schedule: nd||{}, classes: nc||[], title: nt||"", eventUrl: ne||"", students: ns||{}, homeroomClass: nh||"", updated: new Date().toISOString() }, { merge: true });
+                    await db.collection('artifacts').doc(appId).collection('public').doc('data').collection('weekly_plans').doc(syncId).set({ schedule: nd||{}, classes: nc||[], title: nt||"", eventUrl: ne||"", students: ns||{}, homeroomClass: nh||"", heights: nHeights||{}, updated: new Date().toISOString() }, { merge: true });
                     return true;
                 } catch(e){ return false; }
-            }, [user, syncId, appId, data, classes, title, eventUrl, studentsData, homeroomClass]);
+            }, [user, syncId, appId, data, classes, title, eventUrl, studentsData, homeroomClass, slotHeights]);
 
             const triggerSync = async (tid, taid) => {
                 if (!useCloud || !db || !user) return;
@@ -826,6 +853,7 @@
                             if(d.title) setTitle(d.title);
                             if(d.eventUrl !== undefined) setEventUrl(d.eventUrl);
                             if(d.homeroomClass !== undefined) setHomeroomClass(d.homeroomClass);
+                            if(d.heights && typeof d.heights === 'object') setSlotHeights(d.heights);
                             alert("ロード完了");
                         }
                     } else {
@@ -841,6 +869,7 @@
             useEffect(() => { localStorage.setItem('teachersLogData', JSON.stringify(data)); }, [data]);
             useEffect(() => { localStorage.setItem('teachersLogClasses', JSON.stringify(classes)); }, [classes]);
             useEffect(() => { localStorage.setItem('teacherLogStudentsData', JSON.stringify(studentsData)); }, [studentsData]);
+            useEffect(() => { localStorage.setItem('teacherLogHeights', JSON.stringify(slotHeights)); }, [slotHeights]);
             useEffect(() => { localStorage.setItem('teacherLogSyncId', syncId); localStorage.setItem('teacherLogAppId', appId); localStorage.setItem('teacherLogTitle', title); localStorage.setItem('teacherLogEventUrl', eventUrl); localStorage.setItem('teacherLogHomeroom', homeroomClass); }, [syncId, appId, title, eventUrl, homeroomClass]);
 
             const mon = getMonday(date);
@@ -849,12 +878,12 @@
             
             const handleSaveSlot = (dk, sid, nd) => {
                 const upd = { ...data, [dk]: { ...(data[dk]||{}), [sid]: nd } };
-                setData(upd); if (isCloudLoaded) saveCloud(upd, classes, title, eventUrl, studentsData, homeroomClass);
+                setData(upd); if (isCloudLoaded) saveCloud(upd, classes, title, eventUrl, studentsData, homeroomClass, slotHeights);
             };
 
             const downloadBackup = () => {
                 const a = document.createElement('a');
-                a.href = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify({ schedule: data, classes: classes, title: title, eventUrl: eventUrl, students: studentsData, homeroomClass: homeroomClass }));
+                a.href = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify({ schedule: data, classes: classes, title: title, eventUrl: eventUrl, students: studentsData, homeroomClass: homeroomClass, heights: slotHeights }));
                 a.download = "backup_" + formatDateKey(new Date()) + ".json";
                 a.click();
             };
@@ -866,7 +895,7 @@
                     if (window.confirm(msg2)) {
                         setData({});
                         setEventUrl(''); 
-                        if (isCloudLoaded) saveCloud({}, classes, title, '', studentsData, homeroomClass);
+                        if (isCloudLoaded) saveCloud({}, classes, title, '', studentsData, homeroomClass, slotHeights);
                         alert("すべての記録を消去しました。新しい年度の準備が完了しました。");
                     }
                 }
@@ -886,13 +915,44 @@
                         if(p.title) setTitle(p.title);
                         if(p.eventUrl !== undefined) setEventUrl(p.eventUrl);
                         if(p.homeroomClass !== undefined) setHomeroomClass(p.homeroomClass);
-                        if(isCloudLoaded) saveCloud(p.schedule, p.classes, p.title, p.eventUrl || '', p.students || {}, p.homeroomClass || '');
+                        if(p.heights && typeof p.heights === 'object') setSlotHeights(p.heights);
+                        if(isCloudLoaded) saveCloud(p.schedule, p.classes, p.title, p.eventUrl || '', p.students || {}, p.homeroomClass || '', p.heights || {});
                         alert("データを安全に復元しました。");
                     } catch (error) {
                         alert("復元に失敗しました。ファイルが壊れている可能性があります。");
                     }
                 };
                 e.target.value = '';
+            };
+
+            const handleResetHeights = () => {
+                if (window.confirm("各時間枠の高さ(縦幅)を初期状態に戻しますか？")) {
+                    setSlotHeights(DEFAULT_HEIGHTS);
+                    if(isCloudLoaded) saveCloud(data, classes, title, eventUrl, studentsData, homeroomClass, DEFAULT_HEIGHTS);
+                }
+            };
+
+            const startResize = (e, slotId) => {
+                e.preventDefault();
+                const startY = e.clientY;
+                const startHeight = slotHeights[slotId] || DEFAULT_HEIGHTS[slotId];
+
+                const onMouseMove = (moveEvent) => {
+                    const deltaY = moveEvent.clientY - startY;
+                    const newHeight = Math.max(30, startHeight + deltaY); // 最小高さ
+                    setSlotHeights(prev => ({ ...prev, [slotId]: newHeight }));
+                };
+
+                const onMouseUp = () => {
+                    document.removeEventListener('mousemove', onMouseMove);
+                    document.removeEventListener('mouseup', onMouseUp);
+                    // ここでの保存は useEffect [slotHeights] + localStorage に任せ、クラウドには debounce 的に次回保存時に乗せるか、別途保存。
+                    // 頻繁に通信するのを防ぐため、ローカルのみ即反映とし、次回のクラウド同期時に一緒に上げるか、個別に呼ぶ。
+                    // 今回は安全のためローカル保存のみとし、ページリロード後も localStorage から復帰する。
+                };
+
+                document.addEventListener('mousemove', onMouseMove);
+                document.addEventListener('mouseup', onMouseUp);
             };
 
             const SlotCell = ({ dateKey, slot }) => {
@@ -944,7 +1004,7 @@
                 }
 
                 return (
-                    <div className={"border-b border-r border-gray-200 p-1 relative cursor-pointer hover:bg-blue-50 transition-colors group overflow-hidden flex flex-col print:border-black print-row " + slot.height + " " + bg} onClick={() => setModal({isOpen:true, date:dateKey, slotId:slot.id})}>
+                    <div className={"border-b border-r border-gray-200 p-1 relative cursor-pointer hover:bg-blue-50 transition-colors group overflow-hidden flex flex-col h-full print:border-black print-row " + bg} onClick={() => setModal({isOpen:true, date:dateKey, slotId:slot.id})}>
                         {isAttendanceTarget && sd.classId && (
                             <div className="flex flex-wrap gap-1 mb-0.5">
                                 <span className={"font-bold text-[10px] self-start px-1.5 py-0.5 rounded print-border " + th.bgLight + " " + th.text}>{sd.classId}</span>
@@ -971,6 +1031,10 @@
                     </div>
                 );
             };
+
+            const gridStyle = view === 'week' ? {
+                gridTemplateRows: `auto ${TIME_SLOTS.map(s => `${slotHeights[s.id] || DEFAULT_HEIGHTS[s.id]}px`).join(' ')}`
+            } : {};
 
             return (
                 <div className="h-screen flex flex-col print:h-auto">
@@ -1011,14 +1075,14 @@
                             {view === 'week' && (
                                 <div className="h-full overflow-auto custom-scrollbar p-4 print:p-0 print:overflow-visible">
                                     <div className="bg-white shadow rounded border min-w-[800px] print:shadow-none print:min-w-0 print:border-black overflow-hidden">
-                                        <div className="grid grid-cols-[80px_repeat(6,1fr)] bg-white print:bg-white">
+                                        <div className="grid grid-cols-[80px_repeat(6,1fr)] bg-white print:bg-white" style={gridStyle}>
                                             {/* Header */}
                                             <div className="contents">
-                                                <div className="p-3 text-center text-xs font-bold text-gray-500 border-b border-r bg-gray-50 print:border-black">時限</div>
+                                                <div className="p-3 text-center text-xs font-bold text-gray-500 border-b border-r bg-gray-50 print:border-black flex items-center justify-center">時限</div>
                                                 {wDates.map((d, i) => {
                                                     const isT = d.toDateString() === new Date().toDateString();
                                                     return (
-                                                        <div key={i} className={"p-2 text-center border-b border-r print:border-black " + (isT ? "bg-blue-50" : "bg-gray-50")}>
+                                                        <div key={i} className={"p-2 text-center border-b border-r flex flex-col justify-center print:border-black " + (isT ? "bg-blue-50" : "bg-gray-50")}>
                                                             <div className="text-xs text-gray-500">{WEEK_DAYS[i]}</div>
                                                             <div className={"text-lg font-bold " + (i === 5 ? "text-blue-600" : "text-gray-800")}>{d.getDate()}</div>
                                                         </div>
@@ -1033,8 +1097,15 @@
                                                 
                                                 return (
                                                     <React.Fragment key={slot.id}>
-                                                        <div className={"border-b border-r flex items-center justify-center text-xs font-bold text-gray-600 print:border-black print-row " + lb}>
-                                                            {slot.label}
+                                                        <div className={"border-b border-r flex flex-col items-center justify-center text-xs font-bold text-gray-600 relative print:border-black print-row h-full " + lb}>
+                                                            <div className="flex-1 flex items-center justify-center pointer-events-none">
+                                                                {slot.label}
+                                                            </div>
+                                                            <div 
+                                                                className="absolute bottom-0 left-0 w-full h-1.5 cursor-row-resize hover:bg-blue-400 z-10 no-print opacity-50 hover:opacity-100"
+                                                                onMouseDown={(e) => startResize(e, slot.id)}
+                                                                title="上下にドラッグして高さを変更"
+                                                            ></div>
                                                         </div>
                                                         {wDates.map((d, i) => {
                                                             if (i === 5) {
@@ -1054,7 +1125,7 @@
                                                                     const sunLabel = "日曜 (" + sunMonth + "/" + sunDay + ")";
 
                                                                     return (
-                                                                        <div key={i} className="row-span-6 border-b border-r border-gray-200 bg-gray-50 flex flex-col print:border-black print-row">
+                                                                        <div key={i} className="row-span-6 border-b border-r border-gray-200 bg-gray-50 flex flex-col print:border-black print-row h-full">
                                                                             <div 
                                                                                 className="flex-1 flex flex-col p-2 border-b border-gray-200 cursor-pointer hover:bg-blue-50 transition-colors"
                                                                                 onClick={() => setModal({ isOpen: true, date: satKey, slotId: 'sat_memo' })}
@@ -1096,7 +1167,7 @@
                                             <h2 className="text-lg font-bold flex items-center gap-2"><Icons.FileText /> 行事予定表</h2>
                                             {eventUrl && (
                                                 <button 
-                                                    onClick={() => { setEventUrl(''); if(isCloudLoaded) saveCloud(data, classes, title, '', studentsData, homeroomClass); }} 
+                                                    onClick={() => { setEventUrl(''); if(isCloudLoaded) saveCloud(data, classes, title, '', studentsData, homeroomClass, slotHeights); }} 
                                                     className="text-xs bg-red-100 text-red-600 px-3 py-1.5 rounded font-bold hover:bg-red-200 transition-colors"
                                                 >
                                                     URLを解除
@@ -1130,7 +1201,7 @@
                                                                         finalUrl = finalUrl.replace('/view?usp=sharing', '/preview').replace('/view', '/preview');
                                                                     }
                                                                     setEventUrl(finalUrl);
-                                                                    if (isCloudLoaded) saveCloud(data, classes, title, finalUrl, studentsData, homeroomClass);
+                                                                    if (isCloudLoaded) saveCloud(data, classes, title, finalUrl, studentsData, homeroomClass, slotHeights);
                                                                 }
                                                             }}
                                                             className="bg-blue-600 text-white font-bold px-4 py-2 rounded shadow hover:bg-blue-700 whitespace-nowrap transition-colors"
@@ -1160,7 +1231,7 @@
                     </main>
 
                     <SlotModal isOpen={modal.isOpen} onClose={()=>setModal({...modal, isOpen:false})} date={modal.date} slotId={modal.slotId} data={(data[modal.date]||{})[modal.slotId]} onSave={handleSaveSlot} classOptions={classes} studentsData={studentsData} homeroomClass={homeroomClass} />
-                    <SettingsModal isOpen={isSettingsOpen} onClose={()=>setSettingsOpen(false)} classes={classes} onUpdateClasses={c=>{setClasses(c); if(isCloudLoaded)saveCloud(data,c,title,eventUrl,studentsData,homeroomClass);}} syncId={syncId} onUpdateSyncId={setSyncId} appId={appId} onUpdateAppId={setAppId} onTriggerSync={triggerSync} isSyncing={isSyncing} title={title} onUpdateTitle={t=>{setTitle(t); if(isCloudLoaded)saveCloud(data,classes,t,eventUrl,studentsData,homeroomClass);}} onResetData={handleResetData} onUpdateStudents={s=>{setStudentsData(s); if(isCloudLoaded)saveCloud(data,classes,title,eventUrl,s,homeroomClass);}} studentsData={studentsData} homeroomClass={homeroomClass} onUpdateHomeroomClass={h=>{setHomeroomClass(h); if(isCloudLoaded)saveCloud(data,classes,title,eventUrl,studentsData,h);}} />
+                    <SettingsModal isOpen={isSettingsOpen} onClose={()=>setSettingsOpen(false)} classes={classes} onUpdateClasses={c=>{setClasses(c); if(isCloudLoaded)saveCloud(data,c,title,eventUrl,studentsData,homeroomClass,slotHeights);}} syncId={syncId} onUpdateSyncId={setSyncId} appId={appId} onUpdateAppId={setAppId} onTriggerSync={triggerSync} isSyncing={isSyncing} title={title} onUpdateTitle={t=>{setTitle(t); if(isCloudLoaded)saveCloud(data,classes,t,eventUrl,studentsData,homeroomClass,slotHeights);}} onResetData={handleResetData} onUpdateStudents={s=>{setStudentsData(s); if(isCloudLoaded)saveCloud(data,classes,title,eventUrl,s,homeroomClass,slotHeights);}} studentsData={studentsData} homeroomClass={homeroomClass} onUpdateHomeroomClass={h=>{setHomeroomClass(h); if(isCloudLoaded)saveCloud(data,classes,title,eventUrl,studentsData,h,slotHeights);}} onResetHeights={handleResetHeights} />
                 </div>
             );
         };
