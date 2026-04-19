@@ -64,7 +64,7 @@
         }
 
         const { useState, useEffect, useMemo, useCallback, Component } = React;
-        const APP_VERSION = "6.11.0"; // 最新完全統合版（文字サイズ調整・印刷拡張など）
+        const APP_VERSION = "6.11.1"; // 印刷時に年月第何週を表示
 
         class ErrorBoundary extends Component {
             constructor(props) { super(props); this.state = { hasError: false, error: null }; }
@@ -1066,12 +1066,12 @@
 
                     <main className="flex-1 flex flex-col overflow-hidden print:overflow-visible">
                         {view !== 'events' && (
-                            <div className="bg-white border-b px-6 py-2 flex justify-between items-center shrink-0 no-print">
+                            <div className="bg-white border-b px-6 py-2 flex justify-between items-center shrink-0 print:border-none print:px-0 print:py-4">
                                 <div className="flex items-center gap-4">
-                                    <button onClick={() => { const nd=new Date(date); view==='month'?nd.setMonth(nd.getMonth()-1):nd.setDate(nd.getDate()-7); setDate(nd); }} className="p-1 hover:bg-gray-100 rounded-full"><Icons.ChevronLeft/></button>
-                                    <h2 className="text-xl font-bold font-mono text-gray-800">{date.getFullYear()}年 {date.getMonth() + 1}月 {view==='week' && <span className="text-base text-gray-400 ml-2">第{wNum}週</span>}</h2>
-                                    <button onClick={() => { const nd=new Date(date); view==='month'?nd.setMonth(nd.getMonth()+1):nd.setDate(nd.getDate()+7); setDate(nd); }} className="p-1 hover:bg-gray-100 rounded-full"><Icons.ChevronRight/></button>
-                                    <button onClick={()=>{setDate(new Date()); setView('week');}} className="text-xs bg-gray-200 px-2 py-1 rounded font-bold">今日</button>
+                                    <button onClick={() => { const nd=new Date(date); view==='month'?nd.setMonth(nd.getMonth()-1):nd.setDate(nd.getDate()-7); setDate(nd); }} className="p-1 hover:bg-gray-100 rounded-full no-print"><Icons.ChevronLeft/></button>
+                                    <h2 className="text-xl font-bold font-mono text-gray-800 print:text-2xl">{date.getFullYear()}年 {date.getMonth() + 1}月 {view==='week' && <span className="text-base text-gray-400 print:text-gray-600 ml-2">第{wNum}週</span>}</h2>
+                                    <button onClick={() => { const nd=new Date(date); view==='month'?nd.setMonth(nd.getMonth()+1):nd.setDate(nd.getDate()+7); setDate(nd); }} className="p-1 hover:bg-gray-100 rounded-full no-print"><Icons.ChevronRight/></button>
+                                    <button onClick={()=>{setDate(new Date()); setView('week');}} className="text-xs bg-gray-200 px-2 py-1 rounded font-bold no-print">今日</button>
                                 </div>
                             </div>
                         )}
