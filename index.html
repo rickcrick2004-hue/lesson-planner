@@ -64,7 +64,7 @@
         }
 
         const { useState, useEffect, useMemo, useCallback, Component } = React;
-        const APP_VERSION = "6.11.1"; // 印刷時に年月第何週を表示
+        const APP_VERSION = "6.11.2"; // 履歴の授業・欠席フィルター追加版
 
         class ErrorBoundary extends Component {
             constructor(props) { super(props); this.state = { hasError: false, error: null }; }
@@ -608,6 +608,7 @@
         const ClassHistoryView = ({ data, classes, studentsData }) => {
             const [selCls, setSelCls] = useState('ALL');
             const [search, setSearch] = useState("");
+            const [filterType, setFilterType] = useState('class'); // デフォルトは授業のみ表示
             
             const history = useMemo(() => {
                 const list = [];
@@ -615,6 +616,18 @@
                     Object.keys(data[dk] || {}).forEach(sid => {
                         const s = data[dk][sid];
                         if (!s || (!s.plan && !s.actual && !s.unit && (!s.attendance || Object.keys(s.attendance).length === 0) && !s.allPresent)) return;
+                        
+                        // 枠の種別を判定して分ける
+                        let type = 'other';
+                        if (sid === 'absence') type = 'absence';
+                        else {
+                            const t = TIME_SLOTS.find(slot => slot.id === sid);
+                            if (t && t.type === 'class') type = 'class';
+                        }
+                        
+                        // 選択されたタブ（種類）以外のデータは非表示にする
+                        if (filterType !== 'all' && filterType !== type) return;
+
                         if (selCls !== 'ALL' && s.classId !== selCls) return;
                         if (search && !((s.plan||'').includes(search) || (s.actual||'').includes(search) || (s.unit||'').includes(search))) return;
                         
@@ -654,16 +667,32 @@
                     });
                 });
                 return list;
-            }, [data, selCls, search, studentsData]);
+            }, [data, selCls, search, studentsData, filterType]);
 
             return (
                 <div className="bg-white rounded shadow p-4 h-full flex flex-col">
-                    <div className="flex justify-between items-center mb-4 border-b pb-4 gap-4">
-                        <h2 className="text-xl font-bold flex items-center gap-2"><Icons.List />記録検索</h2>
-                        <div className="flex gap-2">
-                            <div className="relative">
+                    <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-4 border-b pb-4 gap-4">
+                        <div className="flex items-center gap-4">
+                            <h2 className="text-xl font-bold flex items-center gap-2"><Icons.List />記録検索</h2>
+                            
+                            {/* 表示切り替えタブ */}
+                            <div className="flex bg-gray-100 p-1 rounded-lg">
+                                {[{id:'class',l:'授業'},{id:'absence',l:'欠席'},{id:'other',l:'その他'},{id:'all',l:'すべて'}].map(f => (
+                                    <button 
+                                        key={f.id} 
+                                        onClick={()=>setFilterType(f.id)} 
+                                        className={"px-3 py-1 text-xs font-bold rounded transition " + (filterType===f.id ? "bg-white shadow text-blue-600":"text-gray-500 hover:text-gray-700")}
+                                    >
+                                        {f.l}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                        
+                        <div className="flex gap-2 w-full md:w-auto">
+                            <div className="relative flex-1 md:flex-none">
                                 <Icons.Search className="absolute left-2 top-2.5 text-gray-400" />
-                                <input type="text" className="pl-8 border p-2 rounded" placeholder="単元・予定を検索..." value={search} onChange={e=>setSearch(e.target.value)} />
+                                <input type="text" className="pl-8 border p-2 rounded w-full" placeholder="単元・予定を検索..." value={search} onChange={e=>setSearch(e.target.value)} />
                             </div>
                             <select className="border p-2 rounded" value={selCls} onChange={e=>setSelCls(e.target.value)}>
                                 <option value="ALL">全クラス</option>
