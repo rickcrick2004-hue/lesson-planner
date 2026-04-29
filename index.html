@@ -64,7 +64,7 @@
         }
 
         const { useState, useEffect, useMemo, useCallback, Component } = React;
-        const APP_VERSION = "6.11.2"; // 履歴の授業・欠席フィルター追加版
+        const APP_VERSION = "6.12.0"; // トータル欠席回数（朝・授業分離）表示追加版
 
         class ErrorBoundary extends Component {
             constructor(props) { super(props); this.state = { hasError: false, error: null }; }
@@ -201,7 +201,7 @@
             );
         };
 
-        const SlotModal = ({ isOpen, onClose, date, slotId, data, onSave, classOptions, studentsData, homeroomClass }) => {
+        const SlotModal = ({ isOpen, onClose, date, slotId, data, onSave, classOptions, studentsData, homeroomClass, attendanceStats }) => {
             if (!isOpen) return null;
             
             let slotDef = TIME_SLOTS.find(s => s.id === slotId);
@@ -309,9 +309,28 @@
                                     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 max-h-48 overflow-y-auto custom-scrollbar p-2 border border-gray-200 rounded-lg bg-gray-50">
                                         {studentsData[attendanceTargetClass].map(st => {
                                             const att = (localData.attendance || {})[st.id];
+                                            
+                                            // トータルカウントの取得
+                                            let countStr = "";
+                                            let statsType = null;
+                                            if (slotId === 'absence') statsType = 'absence';
+                                            else if (slotDef && slotDef.type === 'class') statsType = 'class';
+                                            
+                                            if (statsType && attendanceStats && attendanceStats[attendanceTargetClass] && attendanceStats[attendanceTargetClass][st.id]) {
+                                                const counts = attendanceStats[attendanceTargetClass][st.id][statsType];
+                                                const parts = [];
+                                                if (counts.absent > 0) parts.push(`欠${counts.absent}`);
+                                                if (counts.late > 0) parts.push(`遅${counts.late}`);
+                                                if (counts.early > 0) parts.push(`早${counts.early}`);
+                                                if (parts.length > 0) countStr = `(${parts.join(' ')})`;
+                                            }
+
                                             return (
                                                 <div key={st.id} className="flex flex-col bg-white border border-gray-200 rounded p-1.5 shadow-sm text-[10px]">
-                                                    <div className="font-bold text-gray-800 truncate mb-1">{st.id}. {st.name ? st.name.split(/[　\s]/)[0] : ''}</div>
+                                                    <div className="font-bold text-gray-800 truncate mb-1">
+                                                        {st.id}. {st.name ? st.name.split(/[　\s]/)[0] : ''}
+                                                        {countStr && <span className="text-[9px] text-gray-500 font-normal ml-0.5 whitespace-nowrap tracking-tighter">{countStr}</span>}
+                                                    </div>
                                                     <div className="flex gap-1">
                                                         <button className={`flex-1 rounded py-0.5 ${att==='absent'?'bg-red-500 text-white font-bold':'bg-gray-100 text-gray-600 hover:bg-gray-200'}`} onClick={()=>setAttendance(st.id, 'absent')}>欠</button>
                                                         <button className={`flex-1 rounded py-0.5 ${att==='late'?'bg-yellow-500 text-white font-bold':'bg-gray-100 text-gray-600 hover:bg-gray-200'}`} onClick={()=>setAttendance(st.id, 'late')}>遅</button>
@@ -605,10 +624,10 @@
             );
         };
 
-        const ClassHistoryView = ({ data, classes, studentsData }) => {
+        const ClassHistoryView = ({ data, classes, studentsData, attendanceStats }) => {
             const [selCls, setSelCls] = useState('ALL');
             const [search, setSearch] = useState("");
-            const [filterType, setFilterType] = useState('class'); // デフォルトは授業のみ表示
+            const [filterType, setFilterType] = useState('class'); 
             
             const history = useMemo(() => {
                 const list = [];
@@ -617,7 +636,6 @@
                         const s = data[dk][sid];
                         if (!s || (!s.plan && !s.actual && !s.unit && (!s.attendance || Object.keys(s.attendance).length === 0) && !s.allPresent)) return;
                         
-                        // 枠の種別を判定して分ける
                         let type = 'other';
                         if (sid === 'absence') type = 'absence';
                         else {
@@ -625,7 +643,6 @@
                             if (t && t.type === 'class') type = 'class';
                         }
                         
-                        // 選択されたタブ（種類）以外のデータは非表示にする
                         if (filterType !== 'all' && filterType !== type) return;
 
                         if (selCls !== 'ALL' && s.classId !== selCls) return;
@@ -642,9 +659,23 @@
                                 const st = studentsData[attClass].find(student => student.id == stId);
                                 if (st) {
                                     const name = st.name ? st.name.split(/[　\s]/)[0] : '';
-                                    if (s.attendance[stId] === 'absent') absents.push(name);
-                                    else if (s.attendance[stId] === 'late') lates.push(name);
-                                    else if (s.attendance[stId] === 'early') earlys.push(name);
+                                    
+                                    let cStr = "";
+                                    let statsType = null;
+                                    if (sid === 'absence') statsType = 'absence';
+                                    else {
+                                        const t = TIME_SLOTS.find(slot => slot.id === sid);
+                                        if (t && t.type === 'class') statsType = 'class';
+                                    }
+                                    
+                                    if (statsType && attendanceStats && attendanceStats[attClass] && attendanceStats[attClass][stId]) {
+                                        const c = attendanceStats[attClass][stId][statsType][s.attendance[stId]];
+                                        if (c > 0) cStr = `(${c})`;
+                                    }
+
+                                    if (s.attendance[stId] === 'absent') absents.push(name + cStr);
+                                    else if (s.attendance[stId] === 'late') lates.push(name + cStr);
+                                    else if (s.attendance[stId] === 'early') earlys.push(name + cStr);
                                 }
                             });
                             if(absents.length > 0) attStr += `欠: ${absents.join(', ')}\n`;
@@ -667,7 +698,7 @@
                     });
                 });
                 return list;
-            }, [data, selCls, search, studentsData, filterType]);
+            }, [data, selCls, search, studentsData, filterType, attendanceStats]);
 
             return (
                 <div className="bg-white rounded shadow p-4 h-full flex flex-col">
@@ -675,7 +706,6 @@
                         <div className="flex items-center gap-4">
                             <h2 className="text-xl font-bold flex items-center gap-2"><Icons.List />記録検索</h2>
                             
-                            {/* 表示切り替えタブ */}
                             <div className="flex bg-gray-100 p-1 rounded-lg">
                                 {[{id:'class',l:'授業'},{id:'absence',l:'欠席'},{id:'other',l:'その他'},{id:'all',l:'すべて'}].map(f => (
                                     <button 
@@ -702,7 +732,7 @@
                     </div>
                     <div className="flex-1 overflow-auto custom-scrollbar">
                         <table className="w-full text-left border-collapse text-sm">
-                            <thead className="bg-gray-100 sticky top-0">
+                            <thead className="bg-gray-100 sticky top-0 z-10">
                                 <tr>
                                     <th className="p-3 border-b w-24">日付</th>
                                     <th className="p-3 border-b text-center w-16">クラス</th>
@@ -897,6 +927,55 @@
                 setIsSyncing(false);
             };
 
+            // ---- トータル欠席・遅刻・早退数の事前計算 ----
+            const attendanceStats = useMemo(() => {
+                const stats = {};
+                Object.keys(data).forEach(dateKey => {
+                    const dayData = data[dateKey];
+                    Object.keys(dayData).forEach(slotId => {
+                        const slotData = dayData[slotId];
+                        if (!slotData || !slotData.attendance || slotData.allPresent) return;
+
+                        let slotType = 'other';
+                        if (slotId === 'absence') {
+                            slotType = 'absence';
+                        } else {
+                            const t = TIME_SLOTS.find(s => s.id === slotId);
+                            if (t && t.type === 'class') {
+                                slotType = 'class';
+                            }
+                        }
+
+                        if (slotType !== 'absence' && slotType !== 'class') return;
+
+                        let resolvedClass = slotData.classId;
+                        if (slotData.classId && (!studentsData || !studentsData[slotData.classId])) {
+                            if (slotData.targetClass && studentsData[slotData.targetClass]) resolvedClass = slotData.targetClass;
+                            else if (!slotData.targetClass && homeroomClass && studentsData[homeroomClass]) resolvedClass = homeroomClass;
+                        }
+                        const targetClass = resolvedClass;
+                        
+                        if (!targetClass) return;
+
+                        if (!stats[targetClass]) stats[targetClass] = {};
+
+                        Object.keys(slotData.attendance).forEach(studentId => {
+                            const status = slotData.attendance[studentId]; 
+                            if (!['absent', 'late', 'early'].includes(status)) return;
+                            
+                            if (!stats[targetClass][studentId]) {
+                                stats[targetClass][studentId] = {
+                                    absence: { absent: 0, late: 0, early: 0 },
+                                    class: { absent: 0, late: 0, early: 0 }
+                                };
+                            }
+                            stats[targetClass][studentId][slotType][status]++;
+                        });
+                    });
+                });
+                return stats;
+            }, [data, studentsData, homeroomClass]);
+
             useEffect(() => { localStorage.setItem('teachersLogData', JSON.stringify(data)); }, [data]);
             useEffect(() => { localStorage.setItem('teachersLogClasses', JSON.stringify(classes)); }, [classes]);
             useEffect(() => { localStorage.setItem('teacherLogStudentsData', JSON.stringify(studentsData)); }, [studentsData]);
@@ -1017,9 +1096,20 @@
                         const st = studentsData[resolvedAttClass].find(s => s.id == sid);
                         if (st) {
                             const name = st.name ? st.name.split(/[　\s]/)[0] : '';
-                            if (att[sid] === 'absent') absents.push(name);
-                            else if (att[sid] === 'late') lates.push(name);
-                            else if (att[sid] === 'early') earlys.push(name);
+                            
+                            let cStr = "";
+                            let statsType = null;
+                            if (slot.id === 'absence') statsType = 'absence';
+                            else if (slot.type === 'class') statsType = 'class';
+
+                            if (statsType && attendanceStats[resolvedAttClass] && attendanceStats[resolvedAttClass][sid]) {
+                                const c = attendanceStats[resolvedAttClass][sid][statsType][att[sid]];
+                                if (c > 0) cStr = `(${c})`;
+                            }
+
+                            if (att[sid] === 'absent') absents.push(name + cStr);
+                            else if (att[sid] === 'late') lates.push(name + cStr);
+                            else if (att[sid] === 'early') earlys.push(name + cStr);
                         }
                     });
                     attDisplay = (
@@ -1259,12 +1349,12 @@
                                 </div>
                             )}
 
-                            {view === 'history' && <div className="h-full p-4"><ClassHistoryView data={data} classes={classes} studentsData={studentsData} /></div>}
+                            {view === 'history' && <div className="h-full p-4"><ClassHistoryView data={data} classes={classes} studentsData={studentsData} attendanceStats={attendanceStats} /></div>}
                             {view === 'stats' && <div className="h-full p-4"><StatsView data={data} classes={classes} date={date} /></div>}
                         </div>
                     </main>
 
-                    <SlotModal isOpen={modal.isOpen} onClose={()=>setModal({...modal, isOpen:false})} date={modal.date} slotId={modal.slotId} data={(data[modal.date]||{})[modal.slotId]} onSave={handleSaveSlot} classOptions={classes} studentsData={studentsData} homeroomClass={homeroomClass} />
+                    <SlotModal isOpen={modal.isOpen} onClose={()=>setModal({...modal, isOpen:false})} date={modal.date} slotId={modal.slotId} data={(data[modal.date]||{})[modal.slotId]} onSave={handleSaveSlot} classOptions={classes} studentsData={studentsData} homeroomClass={homeroomClass} attendanceStats={attendanceStats} />
                     <SettingsModal isOpen={isSettingsOpen} onClose={()=>setSettingsOpen(false)} classes={classes} onUpdateClasses={c=>{setClasses(c); if(isCloudLoaded)saveCloud(data,c,title,eventUrl,studentsData,homeroomClass,slotHeights);}} syncId={syncId} onUpdateSyncId={setSyncId} appId={appId} onUpdateAppId={setAppId} onTriggerSync={triggerSync} isSyncing={isSyncing} title={title} onUpdateTitle={t=>{setTitle(t); if(isCloudLoaded)saveCloud(data,classes,t,eventUrl,studentsData,homeroomClass,slotHeights);}} onResetData={handleResetData} onUpdateStudents={s=>{setStudentsData(s); if(isCloudLoaded)saveCloud(data,classes,title,eventUrl,s,homeroomClass,slotHeights);}} studentsData={studentsData} homeroomClass={homeroomClass} onUpdateHomeroomClass={h=>{setHomeroomClass(h); if(isCloudLoaded)saveCloud(data,classes,title,eventUrl,studentsData,h,slotHeights);}} onResetHeights={handleResetHeights} />
                 </div>
             );
