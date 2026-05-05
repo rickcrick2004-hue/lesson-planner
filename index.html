@@ -64,7 +64,7 @@
         }
 
         const { useState, useEffect, useMemo, useCallback, Component } = React;
-        const APP_VERSION = "6.12.1"; // Firebase設定欄の復元版
+        const APP_VERSION = "6.12.2"; // 同期エラーメッセージ改善版
 
         class ErrorBoundary extends Component {
             constructor(props) { super(props); this.state = { hasError: false, error: null }; }
@@ -908,7 +908,14 @@
             }, [user, syncId, appId, data, classes, title, eventUrl, studentsData, homeroomClass, slotHeights]);
 
             const triggerSync = async (tid, taid) => {
-                if (!useCloud || !db || !user) return;
+                if (!useCloud || !db) {
+                    alert("Firebaseの設定が完了していません。下の「Firebase連携」欄にコードを入力して保存してください。");
+                    return;
+                }
+                if (!user) {
+                    alert("データベースに接続中、または認証に失敗しました。少し待ってから再度お試しください。");
+                    return;
+                }
                 setIsSyncing(true);
                 try {
                     const doc = await db.collection('artifacts').doc(taid).collection('public').doc('data').collection('weekly_plans').doc(tid).get();
