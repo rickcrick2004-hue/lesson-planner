@@ -64,7 +64,7 @@
         }
 
         const { useState, useEffect, useMemo, useCallback, Component } = React;
-        const APP_VERSION = "6.12.2"; // 同期エラーメッセージ改善版
+        const APP_VERSION = "6.12.3"; // 月カレンダーの縦並び・単元表示対応版
 
         class ErrorBoundary extends Component {
             constructor(props) { super(props); this.state = { hasError: false, error: null }; }
@@ -608,16 +608,33 @@
                                         const dData = data[dk] || {};
                                         const isToday = formatDateKey(new Date()) === dk;
                                         const dcs = [];
-                                        ['1','2','3','4','5','6','7'].forEach(p => { if (dData[p] && dData[p].classId) dcs.push({p, id: dData[p].classId}); });
+                                        
+                                        ['1','2','3','4','5','6','7'].forEach(p => { 
+                                            if (dData[p] && dData[p].classId) {
+                                                dcs.push({
+                                                    p, 
+                                                    id: dData[p].classId,
+                                                    unit: dData[p].unit,
+                                                    plan: dData[p].plan
+                                                });
+                                            } 
+                                        });
 
                                         return (
                                             <div key={c} onClick={() => onNav(dt)} className={"border-r border-b p-1 cursor-pointer hover:bg-blue-50 flex flex-col " + (isToday ? "bg-blue-50" : "")}>
                                                 <div className="mb-1"><span className={"text-sm font-bold w-6 h-6 flex items-center justify-center rounded-full " + (isToday ? "bg-blue-600 text-white" : "")}>{dt.getDate()}</span></div>
-                                                <div className="flex-1 flex flex-wrap gap-1 content-start overflow-hidden">
+                                                <div className="flex-1 flex flex-col gap-0.5 content-start overflow-hidden">
                                                     {dcs.map((x, i) => {
                                                         const co = classes.find(cl => cl.name === x.id);
                                                         const th = COLOR_PALETTE[co ? co.color : guessColor(x.id)];
-                                                        return <span key={i} className={"text-[10px] font-bold px-1 rounded flex items-center " + th.bgLight + " " + th.text}><span className="opacity-70 mr-0.5">{x.p}</span>{x.id}</span>;
+                                                        const detail = x.unit || x.plan || '';
+                                                        return (
+                                                            <span key={i} className={"text-[10px] font-bold px-1 py-0.5 rounded flex items-center truncate w-full " + th.bgLight + " " + th.text} title={detail}>
+                                                                <span className="opacity-70 mr-1 shrink-0">{x.p}</span>
+                                                                <span className="shrink-0 mr-1">{x.id}</span>
+                                                                <span className="truncate font-normal opacity-90">{detail}</span>
+                                                            </span>
+                                                        );
                                                     })}
                                                 </div>
                                             </div>
