@@ -64,7 +64,7 @@
         }
 
         const { useState, useEffect, useMemo, useCallback, Component } = React;
-        const APP_VERSION = "6.12.3"; // 月カレンダーの縦並び・単元表示対応版
+        const APP_VERSION = "6.12.4"; // 履歴に授業の通算回数を表示する対応版
 
         class ErrorBoundary extends Component {
             constructor(props) { super(props); this.state = { hasError: false, error: null }; }
@@ -655,22 +655,43 @@
             
             const history = useMemo(() => {
                 const list = [];
-                Object.keys(data).sort().reverse().forEach(dk => {
-                    Object.keys(data[dk] || {}).forEach(sid => {
-                        const s = data[dk][sid];
+                const classCounts = {};
+
+                // 古い日付から順に処理して、通算回数をカウントする
+                Object.keys(data).sort().forEach(dk => {
+                    const dayData = data[dk] || {};
+                    // 時限順（1限〜7限など）にソートして処理する
+                    const sids = Object.keys(dayData).sort((a, b) => {
+                        const idxA = TIME_SLOTS.findIndex(s => s.id === a);
+                        const idxB = TIME_SLOTS.findIndex(s => s.id === b);
+                        if (idxA !== -1 && idxB !== -1) return idxA - idxB;
+                        if (idxA !== -1) return -1;
+                        if (idxB !== -1) return 1;
+                        return a.localeCompare(b);
+                    });
+
+                    sids.forEach(sid => {
+                        const s = dayData[sid];
                         if (!s || (!s.plan && !s.actual && !s.unit && (!s.attendance || Object.keys(s.attendance).length === 0) && !s.allPresent)) return;
                         
                         let type = 'other';
-                        if (sid === 'absence') type = 'absence';
-                        else {
+                        let isClassSlot = false;
+                        if (sid === 'absence') {
+                            type = 'absence';
+                        } else {
                             const t = TIME_SLOTS.find(slot => slot.id === sid);
-                            if (t && t.type === 'class') type = 'class';
+                            if (t && t.type === 'class') {
+                                type = 'class';
+                                isClassSlot = true;
+                            }
                         }
                         
-                        if (filterType !== 'all' && filterType !== type) return;
-
-                        if (selCls !== 'ALL' && s.classId !== selCls) return;
-                        if (search && !((s.plan||'').includes(search) || (s.actual||'').includes(search) || (s.unit||'').includes(search))) return;
+                        // その授業が第何回目かを計算
+                        let countNum = null;
+                        if (isClassSlot && s.classId) {
+                            classCounts[s.classId] = (classCounts[s.classId] || 0) + 1;
+                            countNum = classCounts[s.classId];
+                        }
                         
                         let attStr = "";
                         const attClass = s.targetClass || s.classId; 
@@ -687,10 +708,7 @@
                                     let cStr = "";
                                     let statsType = null;
                                     if (sid === 'absence') statsType = 'absence';
-                                    else {
-                                        const t = TIME_SLOTS.find(slot => slot.id === sid);
-                                        if (t && t.type === 'class') statsType = 'class';
-                                    }
+                                    else if (isClassSlot) statsType = 'class';
                                     
                                     if (statsType && attendanceStats && attendanceStats[attClass] && attendanceStats[attClass][stId]) {
                                         const c = attendanceStats[attClass][stId][statsType][s.attendance[stId]];
@@ -718,10 +736,28 @@
                             if (t) periodLabel = t.label;
                         }
 
-                        list.push({ date: dk, period: periodLabel, unit: s.unit, plan: s.plan, actual: s.actual, attStr: attStr, classId: dispClass });
+                        list.push({ 
+                            date: dk, 
+                            period: periodLabel, 
+                            unit: s.unit, 
+                            plan: s.plan, 
+                            actual: s.actual, 
+                            attStr: attStr, 
+                            classId: dispClass,
+                            rawClassId: s.classId,
+                            type: type,
+                            countNum: countNum
+                        });
                     });
                 });
-                return list;
+                
+                // 新しい順に反転してから、表示用のフィルタリングを適用する
+                return list.reverse().filter(h => {
+                    if (filterType !== 'all' && filterType !== h.type) return false;
+                    if (selCls !== 'ALL' && h.rawClassId !== selCls) return false;
+                    if (search && !((h.plan||'').includes(search) || (h.actual||'').includes(search) || (h.unit||'').includes(search))) return false;
+                    return true;
+                });
             }, [data, selCls, search, studentsData, filterType, attendanceStats]);
 
             return (
@@ -770,7 +806,10 @@
                                 {history.map((h, i) => (
                                     <tr key={i} className="border-b hover:bg-gray-50">
                                         <td className="p-3 text-gray-600">{h.date}<br/><span className="text-xs bg-gray-200 px-1 rounded">{h.period}</span></td>
-                                        <td className="p-3 font-bold text-center whitespace-pre-wrap">{h.classId}</td>
+                                        <td className="p-3 font-bold text-center whitespace-pre-wrap">
+                                            {h.classId}
+                                            {h.countNum && <div className="text-[10px] text-blue-600 font-bold mt-1 bg-blue-50 inline-block px-1.5 py-0.5 rounded border border-blue-200">第{h.countNum}回</div>}
+                                        </td>
                                         <td className="p-3 whitespace-pre-wrap text-red-600 font-bold text-xs">{h.attStr}</td>
                                         <td className="p-3 whitespace-pre-wrap font-bold text-blue-800">{h.unit}</td>
                                         <td className="p-3 whitespace-pre-wrap text-gray-800">{h.plan}</td>
