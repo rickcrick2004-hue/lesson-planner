@@ -64,7 +64,7 @@
         }
 
         const { useState, useEffect, useMemo, useCallback, Component } = React;
-        const APP_VERSION = "6.12.4"; // 履歴に授業の通算回数を表示する対応版
+        const APP_VERSION = "6.12.5"; // 履歴画面からの編集機能追加版
 
         class ErrorBoundary extends Component {
             constructor(props) { super(props); this.state = { hasError: false, error: null }; }
@@ -648,7 +648,7 @@
             );
         };
 
-        const ClassHistoryView = ({ data, classes, studentsData, attendanceStats }) => {
+        const ClassHistoryView = ({ data, classes, studentsData, attendanceStats, onEdit }) => {
             const [selCls, setSelCls] = useState('ALL');
             const [search, setSearch] = useState("");
             const [filterType, setFilterType] = useState('class'); 
@@ -746,7 +746,8 @@
                             classId: dispClass,
                             rawClassId: s.classId,
                             type: type,
-                            countNum: countNum
+                            countNum: countNum,
+                            rawSlotId: sid
                         });
                     });
                 });
@@ -804,7 +805,7 @@
                             </thead>
                             <tbody>
                                 {history.map((h, i) => (
-                                    <tr key={i} className="border-b hover:bg-gray-50">
+                                    <tr key={i} className="border-b hover:bg-blue-50 cursor-pointer transition-colors" onClick={() => onEdit(h.date, h.rawSlotId)} title="クリックして編集">
                                         <td className="p-3 text-gray-600">{h.date}<br/><span className="text-xs bg-gray-200 px-1 rounded">{h.period}</span></td>
                                         <td className="p-3 font-bold text-center whitespace-pre-wrap">
                                             {h.classId}
@@ -1419,7 +1420,7 @@
                                 </div>
                             )}
 
-                            {view === 'history' && <div className="h-full p-4"><ClassHistoryView data={data} classes={classes} studentsData={studentsData} attendanceStats={attendanceStats} /></div>}
+                            {view === 'history' && <div className="h-full p-4"><ClassHistoryView data={data} classes={classes} studentsData={studentsData} attendanceStats={attendanceStats} onEdit={(d, s) => setModal({isOpen: true, date: d, slotId: s})} /></div>}
                             {view === 'stats' && <div className="h-full p-4"><StatsView data={data} classes={classes} date={date} /></div>}
                         </div>
                     </main>
