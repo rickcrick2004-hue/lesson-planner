@@ -730,7 +730,7 @@
 
                     sids.forEach(sid => {
                         const s = dayData[sid];
-                        if (!s || (!s.plan && !s.actual && !s.unit && (!s.attendance || Object.keys(s.attendance).length === 0) && !s.allPresent)) return;
+                        if (!s || (!s.classId && !s.plan && !s.actual && !s.unit && (!s.attendance || Object.keys(s.attendance).length === 0) && !s.allPresent)) return;
                         
                         let type = 'other';
                         let isClassSlot = false;
