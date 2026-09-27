@@ -2,15 +2,6 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <script type="importmap">
-  {
-    "imports": {
-      "react": "https://esm.sh/react@18",
-      "react-dom/client": "https://esm.sh/react-dom@18/client",
-      "react/jsx-runtime": "https://esm.sh/react@18/jsx-runtime"
-    }
-  }
-</script>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Teacher's Log Pro</title>
     
@@ -18,6 +9,17 @@
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
     
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    
+    <!-- Babelをクラシックランタイムに強制する設定 -->
+    <script>
+        if (window.Babel) {
+            Babel.registerPreset('react-classic', {
+                presets: [
+                    [Babel.availablePresets['react'], { runtime: 'classic' }]
+                ]
+            });
+        }
+    </script>
     
     <script src="https://cdn.tailwindcss.com"></script>
     
@@ -49,7 +51,8 @@
 <body>
     <div id="root"></div>
 
-   <script type="text/babel" data-type="module">
+    <!-- react-classicプリセットを指定してエラーを回避 -->
+    <script type="text/babel" data-presets="env,react-classic">
         // Firebase Setup
         const defaultFirebaseConfig = { apiKey: "", authDomain: "", projectId: "" };
         let db = null;
@@ -73,7 +76,7 @@
         }
 
         const { useState, useEffect, useMemo, useCallback, Component } = React;
-        const APP_VERSION = "6.12.5"; // 履歴画面からの編集機能追加版
+        const APP_VERSION = "6.12.7"; // Babel設定・クラシックランタイム修正版
 
         class ErrorBoundary extends Component {
             constructor(props) { super(props); this.state = { hasError: false, error: null }; }
@@ -331,6 +334,8 @@
                                                 if (counts.absent > 0) parts.push(`欠${counts.absent}`);
                                                 if (counts.late > 0) parts.push(`遅${counts.late}`);
                                                 if (counts.early > 0) parts.push(`早${counts.early}`);
+                                                if (counts.official > 0) parts.push(`公${counts.official}`);
+                                                if (counts.suspend > 0) parts.push(`停${counts.suspend}`);
                                                 if (parts.length > 0) countStr = `(${parts.join(' ')})`;
                                             }
 
@@ -344,6 +349,8 @@
                                                         <button className={`flex-1 rounded py-0.5 ${att==='absent'?'bg-red-500 text-white font-bold':'bg-gray-100 text-gray-600 hover:bg-gray-200'}`} onClick={()=>setAttendance(st.id, 'absent')}>欠</button>
                                                         <button className={`flex-1 rounded py-0.5 ${att==='late'?'bg-yellow-500 text-white font-bold':'bg-gray-100 text-gray-600 hover:bg-gray-200'}`} onClick={()=>setAttendance(st.id, 'late')}>遅</button>
                                                         <button className={`flex-1 rounded py-0.5 ${att==='early'?'bg-blue-500 text-white font-bold':'bg-gray-100 text-gray-600 hover:bg-gray-200'}`} onClick={()=>setAttendance(st.id, 'early')}>早</button>
+                                                        <button className={`flex-1 rounded py-0.5 ${att==='official'?'bg-purple-500 text-white font-bold':'bg-gray-100 text-gray-600 hover:bg-gray-200'}`} onClick={()=>setAttendance(st.id, 'official')}>公</button>
+                                                        <button className={`flex-1 rounded py-0.5 ${att==='suspend'?'bg-indigo-500 text-white font-bold':'bg-gray-100 text-gray-600 hover:bg-gray-200'}`} onClick={()=>setAttendance(st.id, 'suspend')}>停</button>
                                                     </div>
                                                 </div>
                                             )
@@ -388,7 +395,7 @@
             );
         };
 
-        const SettingsModal = ({ isOpen, onClose, classes, onUpdateClasses, syncId, onUpdateSyncId, appId, onUpdateAppId, onTriggerSync, isSyncing, title, onUpdateTitle, onResetData, onUpdateStudents, studentsData, homeroomClass, onUpdateHomeroomClass, onResetHeights }) => {
+        const SettingsModal = ({ isOpen, onClose, classes, onUpdateClasses, syncId, onUpdateSyncId, appId, onUpdateAppId, onTriggerSync, isSyncing, title, onUpdateTitle, onResetData, onUpdateStudents, studentsData, homeroomClass, onUpdateHomeroomClass, onResetHeights, baseSchedule, onUpdateBaseSchedule }) => {
             if (!isOpen) return null;
             const [lClasses, setLClasses] = useState([...classes]);
             const [lSyncId, setLSyncId] = useState(syncId);
@@ -396,11 +403,13 @@
             const [lTitle, setLTitle] = useState(title);
             const [lHomeroomClass, setLHomeroomClass] = useState(homeroomClass);
             const [configIn, setConfigIn] = useState('');
+            const [lBaseSchedule, setLBaseSchedule] = useState(baseSchedule || {});
 
             const handleSave = () => {
                 onUpdateClasses(lClasses.filter(c => c.name && c.name.trim() !== ''));
                 onUpdateSyncId(lSyncId); onUpdateAppId(lAppId); onUpdateTitle(lTitle);
                 onUpdateHomeroomClass(lHomeroomClass);
+                onUpdateBaseSchedule(lBaseSchedule);
                 onClose();
             };
 
@@ -564,6 +573,46 @@
                                 ))}
                             </div>
 
+                            <div className="bg-yellow-50 p-4 rounded-lg border border-yellow-200 space-y-3 mt-6">
+                                <h3 className="font-bold text-yellow-800 flex items-center gap-1">📅 基本時間割の設定</h3>
+                                <p className="text-xs text-yellow-700 font-medium">週間表示画面で「展開」した際に、自動入力されるクラスを設定します。</p>
+                                <div className="overflow-x-auto custom-scrollbar">
+                                    <table className="w-full text-xs border-collapse">
+                                        <thead>
+                                            <tr>
+                                                <th className="border border-yellow-200 p-1 bg-yellow-100 min-w-[3rem]">時限</th>
+                                                {WEEK_DAYS.map((d, i) => <th key={i} className="border border-yellow-200 p-1 bg-yellow-100 min-w-[4rem]">{d}</th>)}
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {TIME_SLOTS.filter(s => s.type === 'class').map(slot => (
+                                                <tr key={slot.id}>
+                                                    <td className="border border-yellow-200 p-1 text-center font-bold bg-white text-gray-700">{slot.label}</td>
+                                                    {WEEK_DAYS.map((_, dayIdx) => (
+                                                        <td key={dayIdx} className="border border-yellow-200 p-1 bg-white">
+                                                            <select 
+                                                                className="w-full border border-gray-300 rounded p-1 text-[10px]"
+                                                                value={(lBaseSchedule[dayIdx] || {})[slot.id] || ''}
+                                                                onChange={e => {
+                                                                    const val = e.target.value;
+                                                                    const updated = { ...lBaseSchedule };
+                                                                    if (!updated[dayIdx]) updated[dayIdx] = {};
+                                                                    updated[dayIdx][slot.id] = val;
+                                                                    setLBaseSchedule(updated);
+                                                                }}
+                                                            >
+                                                                <option value="">--</option>
+                                                                {lClasses.filter(c => c.name).map((c, i) => <option key={i} value={c.name}>{c.name}</option>)}
+                                                            </select>
+                                                        </td>
+                                                    ))}
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+
                             <div className="bg-red-50 p-4 rounded-lg border border-red-200 space-y-2 mt-6">
                                 <h3 className="font-bold text-red-800 flex items-center gap-1"><Icons.Trash size={16}/> 年度更新・データリセット</h3>
                                 <p className="text-xs text-red-700 font-medium">※すべての予定と実施記録を完全に消去します。<br/>（クラス設定や担任名はそのまま残ります）</p>
@@ -708,7 +757,7 @@
                         if (s.allPresent) {
                             attStr = "全員出席\n";
                         } else if (s.attendance && studentsData && studentsData[attClass]) {
-                            const absents = [], lates = [], earlys = [];
+                            const absents = [], lates = [], earlys = [], officials = [], suspends = [];
                             Object.keys(s.attendance).forEach(stId => {
                                 const st = studentsData[attClass].find(student => student.id == stId);
                                 if (st) {
@@ -727,11 +776,15 @@
                                     if (s.attendance[stId] === 'absent') absents.push(name + cStr);
                                     else if (s.attendance[stId] === 'late') lates.push(name + cStr);
                                     else if (s.attendance[stId] === 'early') earlys.push(name + cStr);
+                                    else if (s.attendance[stId] === 'official') officials.push(name + cStr);
+                                    else if (s.attendance[stId] === 'suspend') suspends.push(name + cStr);
                                 }
                             });
                             if(absents.length > 0) attStr += `欠: ${absents.join(', ')}\n`;
                             if(lates.length > 0) attStr += `遅: ${lates.join(', ')}\n`;
                             if(earlys.length > 0) attStr += `早: ${earlys.join(', ')}\n`;
+                            if(officials.length > 0) attStr += `公: ${officials.join(', ')}\n`;
+                            if(suspends.length > 0) attStr += `停: ${suspends.join(', ')}\n`;
                         }
 
                         let dispClass = s.classId;
@@ -897,6 +950,14 @@
             const [isSettingsOpen, setSettingsOpen] = useState(false);
             const [user, setUser] = useState(null);
 
+            const [baseSchedule, setBaseSchedule] = useState(() => {
+                const saved = localStorage.getItem('teacherLogBaseSchedule');
+                if (saved) {
+                    try { return JSON.parse(saved); } catch(e) {}
+                }
+                return {};
+            });
+
             const [slotHeights, setSlotHeights] = useState(() => {
                 const saved = localStorage.getItem('teacherLogHeights');
                 if (saved) {
@@ -957,6 +1018,7 @@
                         if(d.eventUrl !== undefined) setEventUrl(d.eventUrl);
                         if(d.homeroomClass !== undefined) setHomeroomClass(d.homeroomClass);
                         if(d.heights && typeof d.heights === 'object') setSlotHeights(d.heights);
+                        if(d.baseSchedule && typeof d.baseSchedule === 'object') setBaseSchedule(d.baseSchedule);
                     }
                     setIsCloudLoaded(true);
                 }, err => {
@@ -965,13 +1027,13 @@
                 return () => unsub();
             }, [user, syncId, appId]);
 
-            const saveCloud = useCallback(async (nd=data, nc=classes, nt=title, ne=eventUrl, ns=studentsData, nh=homeroomClass, nHeights=slotHeights) => {
+            const saveCloud = useCallback(async (nd=data, nc=classes, nt=title, ne=eventUrl, ns=studentsData, nh=homeroomClass, nHeights=slotHeights, nb=baseSchedule) => {
                 if (!useCloud || !db || !user) return false;
                 try {
-                    await db.collection('artifacts').doc(appId).collection('public').doc('data').collection('weekly_plans').doc(syncId).set({ schedule: nd||{}, classes: nc||[], title: nt||"", eventUrl: ne||"", students: ns||{}, homeroomClass: nh||"", heights: nHeights||{}, updated: new Date().toISOString() }, { merge: true });
+                    await db.collection('artifacts').doc(appId).collection('public').doc('data').collection('weekly_plans').doc(syncId).set({ schedule: nd||{}, classes: nc||[], title: nt||"", eventUrl: ne||"", students: ns||{}, homeroomClass: nh||"", heights: nHeights||{}, baseSchedule: nb||{}, updated: new Date().toISOString() }, { merge: true });
                     return true;
                 } catch(e){ return false; }
-            }, [user, syncId, appId, data, classes, title, eventUrl, studentsData, homeroomClass, slotHeights]);
+            }, [user, syncId, appId, data, classes, title, eventUrl, studentsData, homeroomClass, slotHeights, baseSchedule]);
 
             const triggerSync = async (tid, taid) => {
                 if (!useCloud || !db) {
@@ -995,6 +1057,7 @@
                             if(d.eventUrl !== undefined) setEventUrl(d.eventUrl);
                             if(d.homeroomClass !== undefined) setHomeroomClass(d.homeroomClass);
                             if(d.heights && typeof d.heights === 'object') setSlotHeights(d.heights);
+                            if(d.baseSchedule && typeof d.baseSchedule === 'object') setBaseSchedule(d.baseSchedule);
                             alert("ロード完了");
                         }
                     } else {
@@ -1041,12 +1104,12 @@
 
                         Object.keys(slotData.attendance).forEach(studentId => {
                             const status = slotData.attendance[studentId]; 
-                            if (!['absent', 'late', 'early'].includes(status)) return;
+                            if (!['absent', 'late', 'early', 'official', 'suspend'].includes(status)) return;
                             
                             if (!stats[targetClass][studentId]) {
                                 stats[targetClass][studentId] = {
-                                    absence: { absent: 0, late: 0, early: 0 },
-                                    class: { absent: 0, late: 0, early: 0 }
+                                    absence: { absent: 0, late: 0, early: 0, official: 0, suspend: 0 },
+                                    class: { absent: 0, late: 0, early: 0, official: 0, suspend: 0 }
                                 };
                             }
                             stats[targetClass][studentId][slotType][status]++;
@@ -1060,6 +1123,7 @@
             useEffect(() => { localStorage.setItem('teachersLogClasses', JSON.stringify(classes)); }, [classes]);
             useEffect(() => { localStorage.setItem('teacherLogStudentsData', JSON.stringify(studentsData)); }, [studentsData]);
             useEffect(() => { localStorage.setItem('teacherLogHeights', JSON.stringify(slotHeights)); }, [slotHeights]);
+            useEffect(() => { localStorage.setItem('teacherLogBaseSchedule', JSON.stringify(baseSchedule)); }, [baseSchedule]);
             useEffect(() => { localStorage.setItem('teacherLogSyncId', syncId); localStorage.setItem('teacherLogAppId', appId); localStorage.setItem('teacherLogTitle', title); localStorage.setItem('teacherLogEventUrl', eventUrl); localStorage.setItem('teacherLogHomeroom', homeroomClass); }, [syncId, appId, title, eventUrl, homeroomClass]);
 
             const mon = getMonday(date);
@@ -1068,12 +1132,12 @@
             
             const handleSaveSlot = (dk, sid, nd) => {
                 const upd = { ...data, [dk]: { ...(data[dk]||{}), [sid]: nd } };
-                setData(upd); if (isCloudLoaded) saveCloud(upd, classes, title, eventUrl, studentsData, homeroomClass, slotHeights);
+                setData(upd); if (isCloudLoaded) saveCloud(upd, classes, title, eventUrl, studentsData, homeroomClass, slotHeights, baseSchedule);
             };
 
             const downloadBackup = () => {
                 const a = document.createElement('a');
-                a.href = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify({ schedule: data, classes: classes, title: title, eventUrl: eventUrl, students: studentsData, homeroomClass: homeroomClass, heights: slotHeights }));
+                a.href = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify({ schedule: data, classes: classes, title: title, eventUrl: eventUrl, students: studentsData, homeroomClass: homeroomClass, heights: slotHeights, baseSchedule: baseSchedule }));
                 a.download = "backup_" + formatDateKey(new Date()) + ".json";
                 a.click();
             };
@@ -1085,7 +1149,7 @@
                     if (window.confirm(msg2)) {
                         setData({});
                         setEventUrl(''); 
-                        if (isCloudLoaded) saveCloud({}, classes, title, '', studentsData, homeroomClass, slotHeights);
+                        if (isCloudLoaded) saveCloud({}, classes, title, '', studentsData, homeroomClass, slotHeights, baseSchedule);
                         alert("すべての記録を消去しました。新しい年度の準備が完了しました。");
                     }
                 }
@@ -1106,7 +1170,8 @@
                         if(p.eventUrl !== undefined) setEventUrl(p.eventUrl);
                         if(p.homeroomClass !== undefined) setHomeroomClass(p.homeroomClass);
                         if(p.heights && typeof p.heights === 'object') setSlotHeights(p.heights);
-                        if(isCloudLoaded) saveCloud(p.schedule, p.classes, p.title, p.eventUrl || '', p.students || {}, p.homeroomClass || '', p.heights || {});
+                        if(p.baseSchedule && typeof p.baseSchedule === 'object') setBaseSchedule(p.baseSchedule);
+                        if(isCloudLoaded) saveCloud(p.schedule, p.classes, p.title, p.eventUrl || '', p.students || {}, p.homeroomClass || '', p.heights || {}, p.baseSchedule || {});
                         alert("データを安全に復元しました。");
                     } catch (error) {
                         alert("復元に失敗しました。ファイルが壊れている可能性があります。");
@@ -1118,7 +1183,46 @@
             const handleResetHeights = () => {
                 if (window.confirm("各時間枠の高さ(縦幅)を初期状態に戻しますか？")) {
                     setSlotHeights(DEFAULT_HEIGHTS);
-                    if(isCloudLoaded) saveCloud(data, classes, title, eventUrl, studentsData, homeroomClass, DEFAULT_HEIGHTS);
+                    if(isCloudLoaded) saveCloud(data, classes, title, eventUrl, studentsData, homeroomClass, DEFAULT_HEIGHTS, baseSchedule);
+                }
+            };
+
+            const applyBaseSchedule = () => {
+                if (Object.keys(baseSchedule).length === 0) {
+                    alert("基本時間割が設定されていません。右上の「設定(⚙️)」から登録してください。");
+                    return;
+                }
+                if (!window.confirm("表示中の週の空き枠に、基本時間割を反映しますか？\n（既に入力されている予定・記録は上書きされません）")) return;
+
+                const newData = { ...data };
+                let updated = false;
+
+                wDates.forEach((d, i) => {
+                    const dk = formatDateKey(d);
+                    const dayBase = baseSchedule[i]; 
+                    
+                    if (dayBase) {
+                        if (!newData[dk]) newData[dk] = {};
+                        Object.keys(dayBase).forEach(slotId => {
+                            const classId = dayBase[slotId];
+                            if (classId) {
+                                const existing = newData[dk][slotId] || {};
+                                const hasContent = existing.plan || existing.actual || existing.unit || existing.classId || (existing.attendance && Object.keys(existing.attendance).length > 0) || existing.allPresent;
+                                if (!hasContent) {
+                                    newData[dk][slotId] = { classId: classId };
+                                    updated = true;
+                                }
+                            }
+                        });
+                    }
+                });
+
+                if (updated) {
+                    setData(newData);
+                    if (isCloudLoaded) saveCloud(newData, classes, title, eventUrl, studentsData, homeroomClass, slotHeights, baseSchedule);
+                    alert("基本時間割を反映しました。");
+                } else {
+                    alert("反映できる空き枠がありませんでした。（すべての枠が入力済み、または基本時間割が未設定です）");
                 }
             };
 
@@ -1171,7 +1275,7 @@
                         </div>
                     );
                 } else if (attKeys.length > 0 && studentsData && studentsData[resolvedAttClass]) {
-                    const absents = [], lates = [], earlys = [];
+                    const absents = [], lates = [], earlys = [], officials = [], suspends = [];
                     attKeys.forEach(sid => {
                         const st = studentsData[resolvedAttClass].find(s => s.id == sid);
                         if (st) {
@@ -1190,6 +1294,8 @@
                             if (att[sid] === 'absent') absents.push(name + cStr);
                             else if (att[sid] === 'late') lates.push(name + cStr);
                             else if (att[sid] === 'early') earlys.push(name + cStr);
+                            else if (att[sid] === 'official') officials.push(name + cStr);
+                            else if (att[sid] === 'suspend') suspends.push(name + cStr);
                         }
                     });
                     attDisplay = (
@@ -1197,6 +1303,8 @@
                             {absents.length > 0 && <div className="text-red-600">欠: {absents.join(', ')}</div>}
                             {lates.length > 0 && <div className="text-yellow-600">遅: {lates.join(', ')}</div>}
                             {earlys.length > 0 && <div className="text-blue-600">早: {earlys.join(', ')}</div>}
+                            {officials.length > 0 && <div className="text-purple-600">公: {officials.join(', ')}</div>}
+                            {suspends.length > 0 && <div className="text-indigo-600">停: {suspends.join(', ')}</div>}
                         </div>
                     );
                 }
@@ -1271,6 +1379,12 @@
                                     <h2 className="text-xl font-bold font-mono text-gray-800 print:text-2xl">{date.getFullYear()}年 {date.getMonth() + 1}月 {view==='week' && <span className="text-base text-gray-400 print:text-gray-600 ml-2">第{wNum}週</span>}</h2>
                                     <button onClick={() => { const nd=new Date(date); view==='month'?nd.setMonth(nd.getMonth()+1):nd.setDate(nd.getDate()+7); setDate(nd); }} className="p-1 hover:bg-gray-100 rounded-full no-print"><Icons.ChevronRight/></button>
                                     <button onClick={()=>{setDate(new Date()); setView('week');}} className="text-xs bg-gray-200 px-2 py-1 rounded font-bold no-print">今日</button>
+                                    
+                                    {view === 'week' && (
+                                        <button onClick={applyBaseSchedule} className="text-xs bg-indigo-100 text-indigo-700 px-3 py-1.5 rounded font-bold no-print hover:bg-indigo-200 ml-2 md:ml-4 flex items-center gap-1 shadow-sm transition">
+                                            ✨ 基本時間割を展開
+                                        </button>
+                                    )}
                                 </div>
                             </div>
                         )}
@@ -1435,7 +1549,7 @@
                     </main>
 
                     <SlotModal isOpen={modal.isOpen} onClose={()=>setModal({...modal, isOpen:false})} date={modal.date} slotId={modal.slotId} data={(data[modal.date]||{})[modal.slotId]} onSave={handleSaveSlot} classOptions={classes} studentsData={studentsData} homeroomClass={homeroomClass} attendanceStats={attendanceStats} />
-                    <SettingsModal isOpen={isSettingsOpen} onClose={()=>setSettingsOpen(false)} classes={classes} onUpdateClasses={c=>{setClasses(c); if(isCloudLoaded)saveCloud(data,c,title,eventUrl,studentsData,homeroomClass,slotHeights);}} syncId={syncId} onUpdateSyncId={setSyncId} appId={appId} onUpdateAppId={setAppId} onTriggerSync={triggerSync} isSyncing={isSyncing} title={title} onUpdateTitle={t=>{setTitle(t); if(isCloudLoaded)saveCloud(data,classes,t,eventUrl,studentsData,homeroomClass,slotHeights);}} onResetData={handleResetData} onUpdateStudents={s=>{setStudentsData(s); if(isCloudLoaded)saveCloud(data,classes,title,eventUrl,s,homeroomClass,slotHeights);}} studentsData={studentsData} homeroomClass={homeroomClass} onUpdateHomeroomClass={h=>{setHomeroomClass(h); if(isCloudLoaded)saveCloud(data,classes,title,eventUrl,studentsData,h,slotHeights);}} onResetHeights={handleResetHeights} />
+                    <SettingsModal isOpen={isSettingsOpen} onClose={()=>setSettingsOpen(false)} classes={classes} onUpdateClasses={c=>{setClasses(c); if(isCloudLoaded)saveCloud(data,c,title,eventUrl,studentsData,homeroomClass,slotHeights,baseSchedule);}} syncId={syncId} onUpdateSyncId={setSyncId} appId={appId} onUpdateAppId={setAppId} onTriggerSync={triggerSync} isSyncing={isSyncing} title={title} onUpdateTitle={t=>{setTitle(t); if(isCloudLoaded)saveCloud(data,classes,t,eventUrl,studentsData,homeroomClass,slotHeights,baseSchedule);}} onResetData={handleResetData} onUpdateStudents={s=>{setStudentsData(s); if(isCloudLoaded)saveCloud(data,classes,title,eventUrl,s,homeroomClass,slotHeights,baseSchedule);}} studentsData={studentsData} homeroomClass={homeroomClass} onUpdateHomeroomClass={h=>{setHomeroomClass(h); if(isCloudLoaded)saveCloud(data,classes,title,eventUrl,studentsData,h,slotHeights,baseSchedule);}} onResetHeights={handleResetHeights} baseSchedule={baseSchedule} onUpdateBaseSchedule={b=>{setBaseSchedule(b); if(isCloudLoaded)saveCloud(data,classes,title,eventUrl,studentsData,homeroomClass,slotHeights,b);}} />
                 </div>
             );
         };
