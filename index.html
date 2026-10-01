@@ -9,8 +9,6 @@
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
     
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-    
-    <!-- Babelをクラシックランタイムに強制する設定 -->
     <script>
         if (window.Babel) {
             Babel.registerPreset('react-classic', {
@@ -20,7 +18,6 @@
             });
         }
     </script>
-    
     <script src="https://cdn.tailwindcss.com"></script>
     
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
@@ -51,7 +48,6 @@
 <body>
     <div id="root"></div>
 
-    <!-- react-classicプリセットを指定してエラーを回避 -->
     <script type="text/babel" data-presets="env,react-classic">
         // Firebase Setup
         const defaultFirebaseConfig = { apiKey: "", authDomain: "", projectId: "" };
@@ -71,14 +67,13 @@
                 if (!firebase.apps.length) firebase.initializeApp(activeConfig);
                 db = firebase.firestore();
                 db.settings({ experimentalForceLongPolling: true });
-                // 【重要】オフライン永続化を有効にすることで、リロード直前の削除も確実に保存される
                 db.enablePersistence().catch(err => console.log("Persistence:", err));
                 auth = firebase.auth();
             } catch (e) { console.error("Firebase init error:", e); }
         }
 
         const { useState, useEffect, useMemo, useCallback, Component } = React;
-        const APP_VERSION = "6.13.0"; // 完成版・バグ修正＆全機能統合
+        const APP_VERSION = "6.14.0"; // 完成版・バグ修正＆全機能統合
 
         class ErrorBoundary extends Component {
             constructor(props) { super(props); this.state = { hasError: false, error: null }; }
@@ -138,22 +133,10 @@
         ];
 
         const DEFAULT_HEIGHTS = {
-            'todo': 64,
-            'collection': 64,
-            'absence': 64,
-            'morning': 80,
-            '0': 112,
-            '1': 112,
-            '2': 112,
-            '3': 112,
-            '4': 112,
-            'lunch': 32,
-            '5': 112,
-            '6': 112,
-            '7': 112,
-            '8': 112,
-            'after': 56,
-            'memo': 80
+            'todo': 64, 'collection': 64, 'absence': 64, 'morning': 80,
+            '0': 112, '1': 112, '2': 112, '3': 112, '4': 112,
+            'lunch': 32, '5': 112, '6': 112, '7': 112, '8': 112,
+            'after': 56, 'memo': 80
         };
 
         const getMonday = (d) => {
@@ -201,7 +184,6 @@
         };
 
         // --- Views & Modals ---
-
         const ClassSelector = ({ selectedClass, onSelect, classes }) => {
             return (
                 <div className="flex flex-wrap gap-2">
@@ -289,7 +271,6 @@
                                         <label className="block text-xs font-bold text-gray-500 mb-2">クラス・科目</label>
                                         <ClassSelector selectedClass={localData.classId} onSelect={c => setLocalData({...localData, classId: c===localData.classId?'':c})} classes={classOptions} />
                                         
-                                        {/* 課外授業チェックボックス */}
                                         {isClass && localData.classId && (
                                             <div className="flex items-center gap-2 mt-3 p-2 bg-purple-50 border border-purple-100 rounded inline-flex">
                                                 <input 
@@ -326,7 +307,6 @@
                                 </div>
                             )}
 
-                            {/* 出欠入力UI */}
                             {isAttendanceTarget && attendanceTargetClass && studentsData[attendanceTargetClass] && (
                                 <div className="shrink-0 flex flex-col space-y-1 mt-2">
                                     <div className="flex justify-between items-end mb-1">
@@ -342,7 +322,6 @@
                                         {studentsData[attendanceTargetClass].map(st => {
                                             const att = (localData.attendance || {})[st.id];
                                             
-                                            // トータルカウントの取得
                                             let countStr = "";
                                             let statsType = null;
                                             if (slotId === 'absence') statsType = 'absence';
@@ -378,7 +357,7 @@
                                                         {st.id}. {st.name ? st.name.split(/[　\s]/)[0] : ''}
                                                         {countStr && <span className="text-[9px] text-gray-500 font-normal ml-0.5 whitespace-nowrap tracking-tighter">{countStr}</span>}
                                                     </div>
-                                                    <div className="flex gap-0.5">
+                                                    <div className="flex gap-0.5 mt-1">
                                                         <button className={`flex-1 rounded py-1 text-[10px] ${att==='absent'?'bg-red-500 text-white font-bold':'bg-gray-100 text-gray-600 hover:bg-gray-200'}`} onClick={()=>setAttendance(st.id, 'absent')}>欠</button>
                                                         <button className={`flex-1 rounded py-1 text-[10px] ${att==='late'?'bg-yellow-500 text-white font-bold':'bg-gray-100 text-gray-600 hover:bg-gray-200'}`} onClick={()=>setAttendance(st.id, 'late')}>遅</button>
                                                         <button className={`flex-1 rounded py-1 text-[10px] ${att==='early'?'bg-blue-500 text-white font-bold':'bg-gray-100 text-gray-600 hover:bg-gray-200'}`} onClick={()=>setAttendance(st.id, 'early')}>早</button>
@@ -392,7 +371,6 @@
                                 </div>
                             )}
 
-                            {/* 単元入力エリア */}
                             {isClass && (
                                 <div className="shrink-0 flex flex-col space-y-1 mt-2">
                                     <label className="block text-sm font-bold text-gray-700">単元</label>
@@ -737,8 +715,7 @@
             );
         };
 
-        const ClassHistoryView = ({ data, classes, studentsData, attendanceStats, onEdit }) => {
-            const [selCls, setSelCls] = useState('ALL');
+        const ClassHistoryView = ({ data, classes, studentsData, attendanceStats, onEdit, selCls, setSelCls }) => {
             const [search, setSearch] = useState("");
             const [filterType, setFilterType] = useState('class'); 
             
@@ -760,7 +737,7 @@
                     sids.forEach(sid => {
                         const s = dayData[sid];
                         const activeAttKeys = (s && s.attendance) ? Object.keys(s.attendance).filter(k => s.attendance[k]) : [];
-                        // 空でもクラス設定があれば表示させる
+                        
                         if (!s || (!s.plan && !s.actual && !s.unit && !s.classId && activeAttKeys.length === 0 && !s.allPresent)) return;
                         
                         let type = 'other';
@@ -917,7 +894,7 @@
             );
         };
 
-        const StatsView = ({ data, classes, date }) => {
+        const StatsView = ({ data, classes, date, onClassClick }) => {
             const [filter, setFilter] = useState('all');
             const counts = useMemo(() => {
                 const c = {}; classes.forEach(i => c[i.name] = { normal: 0, extra: 0 });
@@ -933,7 +910,6 @@
                         if(s && s.classId) {
                             if (!c[s.classId]) c[s.classId] = { normal: 0, extra: 0 };
                             
-                            // 課外チェックONならextra、OFFなら枠に応じて通常/extraに分ける
                             if (s.isExtracurricular) {
                                 c[s.classId].extra += 1;
                             } else if(['1','2','3','4','5','6','7'].includes(sid)) {
@@ -963,7 +939,7 @@
                     </div>
                     <div className="mb-4 flex gap-4 text-xs justify-end shrink-0">
                         <div className="flex items-center gap-1"><span className="w-3 h-3 rounded-full bg-blue-500"></span> 通常授業</div>
-                        <div className="flex items-center gap-1"><span className="w-3 h-3 rounded-full bg-purple-400"></span> 課外授業 (朝・放課後含む)</div>
+                        <div className="flex items-center gap-1"><span className="w-3 h-3 rounded-full bg-purple-400"></span> 課外授業</div>
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4 overflow-auto custom-scrollbar content-start">
                         {classes.map((cls, i) => {
@@ -971,9 +947,9 @@
                             const total = ct.normal + ct.extra;
                             const th = COLOR_PALETTE[cls.color]||COLOR_PALETTE.gray;
                             return (
-                                <div key={i} className="border rounded p-4 bg-gray-50 flex flex-col gap-2">
+                                <div key={i} onClick={() => onClassClick(cls.name)} className="border rounded p-4 bg-gray-50 flex flex-col gap-2 cursor-pointer hover:bg-blue-50 hover:shadow-md transition-all group" title={`${cls.name}の履歴を表示`}>
                                     <div className="flex justify-between items-baseline">
-                                        <span className={"font-bold " + th.text}>{cls.name}</span>
+                                        <span className={"font-bold group-hover:underline " + th.text}>{cls.name}</span>
                                         <div className="text-right flex items-baseline gap-2">
                                             <span className="text-sm font-bold text-gray-700">{total} <span className="text-[10px] text-gray-500 font-normal">コマ</span></span>
                                             {total > 0 && (
@@ -995,11 +971,10 @@
             );
         };
 
-        // --- Main App ---
-
         const App = () => {
             const [date, setDate] = useState(new Date()); 
             const [view, setView] = useState('week'); 
+            const [historyFilter, setHistoryFilter] = useState('ALL');
             const [data, setData] = useState({}); 
             const [classes, setClasses] = useState(DEFAULT_CLASSES);
             const [studentsData, setStudentsData] = useState({}); 
@@ -1094,7 +1069,6 @@
             const saveCloud = useCallback(async (nd=data, nc=classes, nt=title, ne=eventUrl, ns=studentsData, nh=homeroomClass, nHeights=slotHeights, nb=baseSchedule) => {
                 if (!useCloud || !db || !user) return false;
                 try {
-                    // 【重要】 { merge: true } を排除し、常にドキュメント全体を安全に上書き置換する
                     await db.collection('artifacts').doc(appId).collection('public').doc('data').collection('weekly_plans').doc(syncId).set({ 
                         schedule: nd||{}, 
                         classes: nc||[], 
@@ -1145,7 +1119,6 @@
                 setIsSyncing(false);
             };
 
-            // ---- トータル欠席・遅刻・早退・公・停 数の事前計算 ----
             const attendanceStats = useMemo(() => {
                 const stats = {};
                 Object.keys(data).forEach(dateKey => {
@@ -1343,7 +1316,6 @@
                             newData[dk] = newDayData;
                         }
                         setData(newData);
-                        // ゴミ箱の削除結果も確実にクラウドへ完全上書き保存する
                         if (isCloudLoaded) saveCloud(newData, classes, title, eventUrl, studentsData, homeroomClass, slotHeights, baseSchedule);
                     }
                 } else {
@@ -1531,7 +1503,6 @@
                                 <div className="h-full overflow-auto custom-scrollbar p-4 print:p-0 print:overflow-visible">
                                     <div className="bg-white shadow rounded border min-w-[800px] print:shadow-none print:min-w-0 print:border-black overflow-hidden print:overflow-visible">
                                         <div className="grid grid-cols-[80px_repeat(6,1fr)] bg-white print:bg-white week-grid">
-                                            {/* Header */}
                                             <div className="contents">
                                                 <div className="p-3 text-center text-xs font-bold text-gray-500 border-b border-r bg-gray-50 print:border-black flex items-center justify-center">時限</div>
                                                 {wDates.map((d, i) => {
@@ -1552,7 +1523,6 @@
                                                 })}
                                             </div>
                                             
-                                            {/* Body */}
                                             {TIME_SLOTS.map(slot => {
                                                 let lb = 'bg-gray-50';
                                                 if(slot.id==='lunch') lb='bg-gray-100'; else if(['todo','collection','absence','morning'].includes(slot.id)) lb='bg-yellow-100'; else if(['after','memo'].includes(slot.id)) lb='bg-orange-100';
@@ -1687,8 +1657,8 @@
                                 </div>
                             )}
 
-                            {view === 'history' && <div className="h-full p-4"><ClassHistoryView data={data} classes={classes} studentsData={studentsData} attendanceStats={attendanceStats} onEdit={(d, s) => setModal({isOpen: true, date: d, slotId: s})} /></div>}
-                            {view === 'stats' && <div className="h-full p-4"><StatsView data={data} classes={classes} date={date} /></div>}
+                            {view === 'history' && <div className="h-full p-4"><ClassHistoryView data={data} classes={classes} studentsData={studentsData} attendanceStats={attendanceStats} onEdit={(d, s) => setModal({isOpen: true, date: d, slotId: s})} selCls={historyFilter} setSelCls={setHistoryFilter} /></div>}
+                            {view === 'stats' && <div className="h-full p-4"><StatsView data={data} classes={classes} date={date} onClassClick={(c) => { setHistoryFilter(c); setView('history'); }} /></div>}
                         </div>
                     </main>
 
