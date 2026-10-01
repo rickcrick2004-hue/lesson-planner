@@ -238,7 +238,7 @@
             const setAttendance = (sId, status) => {
                 const newAtt = { ...(localData.attendance || {}) };
                 if (newAtt[sId] === status) {
-                    delete newAtt[sId];
+                    newAtt[sId] = null;
                 } else {
                     newAtt[sId] = status;
                 }
@@ -734,7 +734,8 @@
 
                     sids.forEach(sid => {
                         const s = dayData[sid];
-                        if (!s || (!s.classId && !s.plan && !s.actual && !s.unit && (!s.attendance || Object.keys(s.attendance).length === 0) && !s.allPresent)) return;
+                        const activeAttKeys = (s && s.attendance) ? Object.keys(s.attendance).filter(k => s.attendance[k]) : [];
+                        if (!s || (!s.classId && !s.plan && !s.actual && !s.unit && activeAttKeys.length === 0 && !s.allPresent)) return;
                         
                         let type = 'other';
                         let isClassSlot = false;
@@ -1065,7 +1066,8 @@
             const saveCloud = useCallback(async (nd=data, nc=classes, nt=title, ne=eventUrl, ns=studentsData, nh=homeroomClass, nHeights=slotHeights, nb=baseSchedule) => {
                 if (!useCloud || !db || !user) return false;
                 try {
-                    await db.collection('artifacts').doc(appId).collection('public').doc('data').collection('weekly_plans').doc(syncId).set({ schedule: nd||{}, classes: nc||[], title: nt||"", eventUrl: ne||"", students: ns||{}, homeroomClass: nh||"", heights: nHeights||{}, baseSchedule: nb||{}, updated: new Date().toISOString() }, { merge: true });
+                    // { merge: true } を外して、常にドキュメント全体を完全に置き換えるように修正
+                    await db.collection('artifacts').doc(appId).collection('public').doc('data').collection('weekly_plans').doc(syncId).set({ schedule: nd||{}, classes: nc||[], title: nt||"", eventUrl: ne||"", students: ns||{}, homeroomClass: nh||"", heights: nHeights||{}, baseSchedule: nb||{}, updated: new Date().toISOString() });
                     return true;
                 } catch(e){ return false; }
             }, [user, syncId, appId, data, classes, title, eventUrl, studentsData, homeroomClass, slotHeights, baseSchedule]);
@@ -1278,12 +1280,14 @@
                     if (!slot) return;
                     
                     // クラス設定以外に何らかのデータが入力されているか判定
-                    const hasContent = slot.plan || slot.actual || slot.unit || slot.targetClass || (slot.attendance && Object.keys(slot.attendance).length > 0) || slot.allPresent;
+                    const activeAttKeys = slot.attendance ? Object.keys(slot.attendance).filter(k => slot.attendance[k]) : [];
+                    const hasContent = slot.plan || slot.actual || slot.unit || slot.targetClass || activeAttKeys.length > 0 || slot.allPresent;
                     
                     if (slot.classId) {
                         if (hasContent) {
                             hasProtected = true;
                         } else {
+                            // 空文字を入れるのではなく、プロパティ自体を完全に消去する
                             delete newDayData[slotId];
                             deletedCount++;
                         }
@@ -1293,7 +1297,13 @@
                 if (deletedCount > 0) {
                     const confirmMsg = `${targetDate.getMonth()+1}/${targetDate.getDate()} (${WEEK_DAYS[dayIndex]}) の未入力のクラス設定（${deletedCount}件）をクリアしますか？\n（※予定や記録などが入力済みの枠は保護されます）`;
                     if (window.confirm(confirmMsg)) {
-                        const newData = { ...data, [dk]: newDayData };
+                        const newData = { ...data };
+                        // もしその日の中身が完全に空になったら、日付データごと消去する
+                        if (Object.keys(newDayData).length === 0) {
+                            delete newData[dk];
+                        } else {
+                            newData[dk] = newDayData;
+                        }
                         setData(newData);
                         if (isCloudLoaded) saveCloud(newData, classes, title, eventUrl, studentsData, homeroomClass, slotHeights, baseSchedule);
                     }
@@ -1339,7 +1349,7 @@
                 const isClass = slot.type === 'class';
 
                 const att = sd.attendance || {};
-                const attKeys = Object.keys(att);
+                const attKeys = Object.keys(att).filter(k => att[k]);
                 let attDisplay = null;
                 
                 let resolvedAttClass = sd.classId;
