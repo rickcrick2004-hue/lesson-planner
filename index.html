@@ -7,8 +7,8 @@
     
     <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
-    
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    
     <script>
         if (window.Babel) {
             Babel.registerPreset('react-classic', {
@@ -18,6 +18,7 @@
             });
         }
     </script>
+    
     <script src="https://cdn.tailwindcss.com"></script>
     
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
@@ -49,7 +50,6 @@
     <div id="root"></div>
 
     <script type="text/babel" data-presets="env,react-classic">
-        // Firebase Setup
         const defaultFirebaseConfig = { apiKey: "", authDomain: "", projectId: "" };
         let db = null;
         let auth = null;
@@ -73,7 +73,7 @@
         }
 
         const { useState, useEffect, useMemo, useCallback, Component } = React;
-        const APP_VERSION = "6.14.0"; // 完成版・バグ修正＆全機能統合
+        const APP_VERSION = "6.15.0"; // テキスト出力機能追加版
 
         class ErrorBoundary extends Component {
             constructor(props) { super(props); this.state = { hasError: false, error: null }; }
@@ -180,7 +180,8 @@
             Printer: ({size=20, className=""}) => <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2-2v5a2 2 0 0 1-2 2h-2"/><rect width="12" height="8" x="6" y="14"/></svg>,
             Search: ({size=20, className=""}) => <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>,
             FileText: ({size=20, className=""}) => <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>,
-            Users: ({size=20, className=""}) => <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+            Users: ({size=20, className=""}) => <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>,
+            Copy: ({size=14, className=""}) => <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
         };
 
         // --- Views & Modals ---
@@ -400,6 +401,50 @@
                         <div className="p-4 border-t bg-gray-50 flex justify-end gap-3 shrink-0 rounded-b-xl">
                             <button onClick={onClose} className="px-5 py-2.5 rounded-lg text-gray-600 hover:bg-gray-200 font-bold transition-colors">キャンセル</button>
                             <button onClick={handleSaveClick} className="px-8 py-2.5 rounded-lg bg-blue-600 text-white font-bold shadow-md hover:bg-blue-700 transition-colors">保存する</button>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        const DailyReportModal = ({ isOpen, onClose, reportText }) => {
+            if (!isOpen) return null;
+            const [copied, setCopied] = useState(false);
+
+            const handleCopy = () => {
+                const textarea = document.getElementById('daily-report-textarea');
+                textarea.select();
+                document.execCommand('copy');
+                setCopied(true);
+                setTimeout(() => setCopied(false), 2000);
+            };
+
+            return (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 md:p-6">
+                    <div className="bg-white rounded-xl w-full max-w-2xl shadow-2xl flex flex-col h-[80vh]">
+                        <div className="p-4 border-b bg-gray-800 text-white flex justify-between items-center shrink-0 rounded-t-xl">
+                            <h2 className="text-lg font-bold flex items-center gap-2"><Icons.FileText size={20} />日報出力（テキスト化）</h2>
+                            <button onClick={onClose} className="p-2 hover:bg-gray-700 rounded-full transition-colors"><Icons.X /></button>
+                        </div>
+                        
+                        <div className="p-4 bg-blue-50 text-sm text-blue-800 font-medium shrink-0 flex items-center justify-between border-b border-blue-100">
+                            <p>このテキストをコピーして、日記アプリや報告用ツールに貼り付けてください。</p>
+                            <button 
+                                onClick={handleCopy} 
+                                className={`px-4 py-2 rounded-lg font-bold flex items-center gap-2 transition-all shadow-sm ${copied ? 'bg-green-600 text-white' : 'bg-blue-600 text-white hover:bg-blue-700'}`}
+                            >
+                                <Icons.Copy size={16} />
+                                {copied ? 'コピーしました！' : 'テキストをコピー'}
+                            </button>
+                        </div>
+
+                        <div className="p-5 overflow-y-auto flex-1 bg-gray-50 custom-scrollbar">
+                            <textarea 
+                                id="daily-report-textarea"
+                                className="w-full h-full bg-white border border-gray-300 rounded p-4 text-sm font-mono resize-none focus:outline-none"
+                                value={reportText}
+                                readOnly
+                            />
                         </div>
                     </div>
                 </div>
@@ -971,6 +1016,7 @@
             );
         };
 
+        // --- Main App ---
         const App = () => {
             const [date, setDate] = useState(new Date()); 
             const [view, setView] = useState('week'); 
@@ -986,6 +1032,7 @@
             const [isSyncing, setIsSyncing] = useState(false);
             const [isCloudLoaded, setIsCloudLoaded] = useState(false);
             const [modal, setModal] = useState({ isOpen: false, date: null, slotId: null });
+            const [reportModal, setReportModal] = useState({ isOpen: false, text: '' });
             const [isSettingsOpen, setSettingsOpen] = useState(false);
             const [user, setUser] = useState(null);
 
@@ -1069,6 +1116,7 @@
             const saveCloud = useCallback(async (nd=data, nc=classes, nt=title, ne=eventUrl, ns=studentsData, nh=homeroomClass, nHeights=slotHeights, nb=baseSchedule) => {
                 if (!useCloud || !db || !user) return false;
                 try {
+                    // Firebaseに完全上書き保存する
                     await db.collection('artifacts').doc(appId).collection('public').doc('data').collection('weekly_plans').doc(syncId).set({ 
                         schedule: nd||{}, 
                         classes: nc||[], 
@@ -1327,6 +1375,105 @@
                 }
             };
 
+            const openReportModal = (targetDate, dayIndex) => {
+                const dk = formatDateKey(targetDate);
+                const dayData = data[dk] || {};
+                const dLabel = `${targetDate.getFullYear()}年${targetDate.getMonth() + 1}月${targetDate.getDate()}日 (${WEEK_DAYS[dayIndex]})`;
+                let text = `【${dLabel} の記録】\n\n`;
+                
+                let hasAnyData = false;
+
+                TIME_SLOTS.forEach(slot => {
+                    const sd = dayData[slot.id];
+                    if (!sd) return;
+                    
+                    const activeAttKeys = sd.attendance ? Object.keys(sd.attendance).filter(k => sd.attendance[k]) : [];
+                    const hasContent = sd.classId || sd.plan || sd.actual || sd.unit || activeAttKeys.length > 0 || sd.allPresent;
+                    
+                    if (!hasContent) return;
+                    hasAnyData = true;
+
+                    let slotText = `■ ${slot.label}`;
+                    if (sd.classId) {
+                        slotText += `：${sd.classId}`;
+                        if (sd.isExtracurricular) slotText += `[課外]`;
+                    }
+                    if (sd.targetClass && sd.targetClass !== sd.classId) slotText += ` (${sd.targetClass})`;
+                    if (sd.unit) slotText += `（単元：${sd.unit}）`;
+                    text += slotText + `\n`;
+
+                    if (sd.plan) text += `予定：${sd.plan}\n`;
+                    if (sd.actual) text += `実施：${sd.actual}\n`;
+                    
+                    let attStr = "";
+                    let resolvedAttClass = sd.classId;
+                    if (sd.classId && (!studentsData || !studentsData[sd.classId])) {
+                        if (sd.targetClass && studentsData[sd.targetClass]) resolvedAttClass = sd.targetClass;
+                        else if (!sd.targetClass && homeroomClass && studentsData[homeroomClass]) resolvedAttClass = homeroomClass;
+                    }
+
+                    if (sd.allPresent) {
+                        attStr = "全員出席";
+                    } else if (activeAttKeys.length > 0 && studentsData && studentsData[resolvedAttClass]) {
+                        const absents = [], lates = [], earlys = [], officials = [], suspends = [];
+                        activeAttKeys.forEach(sid => {
+                            const st = studentsData[resolvedAttClass].find(s => s.id == sid);
+                            if (st) {
+                                const name = st.name ? st.name.split(/[　\s]/)[0] : '';
+                                const status = sd.attendance[sid];
+                                if (status === 'absent') absents.push(name);
+                                else if (status === 'late') lates.push(name);
+                                else if (status === 'early') earlys.push(name);
+                                else if (status === 'official') officials.push(name);
+                                else if (status === 'suspend') suspends.push(name);
+                            }
+                        });
+                        const parts = [];
+                        if (absents.length > 0) parts.push(`欠: ${absents.join(', ')}`);
+                        if (lates.length > 0) parts.push(`遅: ${lates.join(', ')}`);
+                        if (earlys.length > 0) parts.push(`早: ${earlys.join(', ')}`);
+                        if (officials.length > 0) parts.push(`公: ${officials.join(', ')}`);
+                        if (suspends.length > 0) parts.push(`停: ${suspends.join(', ')}`);
+                        if (parts.length > 0) attStr = parts.join(' / ');
+                    }
+                    if (attStr) text += `出欠：${attStr}\n`;
+                    
+                    text += `\n`;
+                });
+
+                if (dayIndex === 5) {
+                    const satMemo = dayData['sat_memo'];
+                    if (satMemo && (satMemo.plan || satMemo.actual)) {
+                        hasAnyData = true;
+                        text += `■ 土曜メモ\n`;
+                        if (satMemo.plan) text += `内容：${satMemo.plan}\n`;
+                        if (satMemo.actual) text += `実施：${satMemo.actual}\n`;
+                        text += `\n`;
+                    }
+                    
+                    const sunDate = new Date(targetDate);
+                    sunDate.setDate(targetDate.getDate() + 1);
+                    const sunDk = formatDateKey(sunDate);
+                    const sunData = data[sunDk] || {};
+                    const sunMemo = sunData['sun_memo'];
+                    
+                    if (sunMemo && (sunMemo.plan || sunMemo.actual)) {
+                        hasAnyData = true;
+                        text += `【${sunDate.getFullYear()}年${sunDate.getMonth() + 1}月${sunDate.getDate()}日 (日) の記録】\n\n`;
+                        text += `■ 日曜メモ\n`;
+                        if (sunMemo.plan) text += `内容：${sunMemo.plan}\n`;
+                        if (sunMemo.actual) text += `実施：${sunMemo.actual}\n`;
+                        text += `\n`;
+                    }
+                }
+
+                if (!hasAnyData) {
+                    text += `記録はありません。\n`;
+                }
+
+                setReportModal({ isOpen: true, text: text.trim() });
+            };
+
             const startResize = (e, slotId) => {
                 e.preventDefault();
                 const startY = e.clientY;
@@ -1503,6 +1650,7 @@
                                 <div className="h-full overflow-auto custom-scrollbar p-4 print:p-0 print:overflow-visible">
                                     <div className="bg-white shadow rounded border min-w-[800px] print:shadow-none print:min-w-0 print:border-black overflow-hidden print:overflow-visible">
                                         <div className="grid grid-cols-[80px_repeat(6,1fr)] bg-white print:bg-white week-grid">
+                                            {/* Header */}
                                             <div className="contents">
                                                 <div className="p-3 text-center text-xs font-bold text-gray-500 border-b border-r bg-gray-50 print:border-black flex items-center justify-center">時限</div>
                                                 {wDates.map((d, i) => {
@@ -1511,18 +1659,28 @@
                                                         <div key={i} className={"p-2 text-center border-b border-r flex flex-col justify-center relative group print:border-black " + (isT ? "bg-blue-50" : "bg-gray-50")}>
                                                             <div className="text-xs text-gray-500">{WEEK_DAYS[i]}</div>
                                                             <div className={"text-lg font-bold " + (i === 5 ? "text-blue-600" : "text-gray-800")}>{d.getDate()}</div>
-                                                            <button 
-                                                                onClick={() => clearDaySchedule(d, i)}
-                                                                className="absolute top-1 right-1 p-1 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded opacity-0 group-hover:opacity-100 transition-opacity no-print"
-                                                                title={`${WEEK_DAYS[i]}曜日の未入力枠をクリア`}
-                                                            >
-                                                                <Icons.Trash size={14} />
-                                                            </button>
+                                                            <div className="absolute top-1 right-1 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity no-print">
+                                                                <button 
+                                                                    onClick={() => openReportModal(d, i)}
+                                                                    className="p-1 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded"
+                                                                    title={`${WEEK_DAYS[i]}曜日の記録をテキスト化してコピー`}
+                                                                >
+                                                                    <Icons.FileText size={14} />
+                                                                </button>
+                                                                <button 
+                                                                    onClick={() => clearDaySchedule(d, i)}
+                                                                    className="p-1 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded"
+                                                                    title={`${WEEK_DAYS[i]}曜日の未入力枠をクリア`}
+                                                                >
+                                                                    <Icons.Trash size={14} />
+                                                                </button>
+                                                            </div>
                                                         </div>
                                                     );
                                                 })}
                                             </div>
                                             
+                                            {/* Body */}
                                             {TIME_SLOTS.map(slot => {
                                                 let lb = 'bg-gray-50';
                                                 if(slot.id==='lunch') lb='bg-gray-100'; else if(['todo','collection','absence','morning'].includes(slot.id)) lb='bg-yellow-100'; else if(['after','memo'].includes(slot.id)) lb='bg-orange-100';
@@ -1664,6 +1822,7 @@
 
                     <SlotModal isOpen={modal.isOpen} onClose={()=>setModal({...modal, isOpen:false})} date={modal.date} slotId={modal.slotId} data={(data[modal.date]||{})[modal.slotId]} onSave={handleSaveSlot} classOptions={classes} studentsData={studentsData} homeroomClass={homeroomClass} attendanceStats={attendanceStats} />
                     <SettingsModal isOpen={isSettingsOpen} onClose={()=>setSettingsOpen(false)} classes={classes} onUpdateClasses={c=>{setClasses(c); if(isCloudLoaded)saveCloud(data,c,title,eventUrl,studentsData,homeroomClass,slotHeights,baseSchedule);}} syncId={syncId} onUpdateSyncId={setSyncId} appId={appId} onUpdateAppId={setAppId} onTriggerSync={triggerSync} isSyncing={isSyncing} title={title} onUpdateTitle={t=>{setTitle(t); if(isCloudLoaded)saveCloud(data,classes,t,eventUrl,studentsData,homeroomClass,slotHeights,baseSchedule);}} onResetData={handleResetData} onUpdateStudents={s=>{setStudentsData(s); if(isCloudLoaded)saveCloud(data,classes,title,eventUrl,s,homeroomClass,slotHeights,baseSchedule);}} studentsData={studentsData} homeroomClass={homeroomClass} onUpdateHomeroomClass={h=>{setHomeroomClass(h); if(isCloudLoaded)saveCloud(data,classes,title,eventUrl,studentsData,h,slotHeights,baseSchedule);}} onResetHeights={handleResetHeights} baseSchedule={baseSchedule} onUpdateBaseSchedule={b=>{setBaseSchedule(b); if(isCloudLoaded)saveCloud(data,classes,title,eventUrl,studentsData,homeroomClass,slotHeights,b);}} />
+                    <DailyReportModal isOpen={reportModal.isOpen} onClose={()=>setReportModal({isOpen: false, text: ''})} reportText={reportModal.text} />
                 </div>
             );
         };
