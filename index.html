@@ -202,7 +202,7 @@
             );
         };
 
-        const SlotModal = ({ isOpen, onClose, date, slotId, data, onSave, classOptions, studentsData, homeroomClass, attendanceStats }) => {
+        const SlotModal = ({ isOpen, onClose, date, slotId, data, onSave, classOptions, studentsData, homeroomClass, attendanceStats, onJumpToHistory }) => {
             if (!isOpen) return null;
             
             let slotDef = TIME_SLOTS.find(s => s.id === slotId);
@@ -271,6 +271,17 @@
                                     <div>
                                         <label className="block text-xs font-bold text-gray-500 mb-2">クラス・科目</label>
                                         <ClassSelector selectedClass={localData.classId} onSelect={c => setLocalData({...localData, classId: c===localData.classId?'':c})} classes={classOptions} />
+                                        
+                                        {localData.classId && onJumpToHistory && (
+                                            <button
+                                                onClick={() => onJumpToHistory(localData.classId)}
+                                                className="mt-3 mr-3 px-3 py-2 bg-blue-50 text-blue-700 border border-blue-200 text-xs font-bold rounded-lg shadow-sm hover:bg-blue-100 flex items-center gap-1 inline-flex transition-colors"
+                                                title={`${localData.classId}の過去の記録を確認する`}
+                                            >
+                                                <Icons.List size={14} />
+                                                このクラスの過去の記録を見る
+                                            </button>
+                                        )}
                                         
                                         {isClass && localData.classId && (
                                             <div className="flex items-center gap-2 mt-3 p-2 bg-purple-50 border border-purple-100 rounded inline-flex">
@@ -1820,7 +1831,7 @@
                         </div>
                     </main>
 
-                    <SlotModal isOpen={modal.isOpen} onClose={()=>setModal({...modal, isOpen:false})} date={modal.date} slotId={modal.slotId} data={(data[modal.date]||{})[modal.slotId]} onSave={handleSaveSlot} classOptions={classes} studentsData={studentsData} homeroomClass={homeroomClass} attendanceStats={attendanceStats} />
+                    <SlotModal isOpen={modal.isOpen} onClose={()=>setModal({...modal, isOpen:false})} date={modal.date} slotId={modal.slotId} data={(data[modal.date]||{})[modal.slotId]} onSave={handleSaveSlot} classOptions={classes} studentsData={studentsData} homeroomClass={homeroomClass} attendanceStats={attendanceStats} onJumpToHistory={(c) => { setModal({...modal, isOpen: false}); setHistoryFilter(c); setView('history'); }} />
                     <SettingsModal isOpen={isSettingsOpen} onClose={()=>setSettingsOpen(false)} classes={classes} onUpdateClasses={c=>{setClasses(c); if(isCloudLoaded)saveCloud(data,c,title,eventUrl,studentsData,homeroomClass,slotHeights,baseSchedule);}} syncId={syncId} onUpdateSyncId={setSyncId} appId={appId} onUpdateAppId={setAppId} onTriggerSync={triggerSync} isSyncing={isSyncing} title={title} onUpdateTitle={t=>{setTitle(t); if(isCloudLoaded)saveCloud(data,classes,t,eventUrl,studentsData,homeroomClass,slotHeights,baseSchedule);}} onResetData={handleResetData} onUpdateStudents={s=>{setStudentsData(s); if(isCloudLoaded)saveCloud(data,classes,title,eventUrl,s,homeroomClass,slotHeights,baseSchedule);}} studentsData={studentsData} homeroomClass={homeroomClass} onUpdateHomeroomClass={h=>{setHomeroomClass(h); if(isCloudLoaded)saveCloud(data,classes,title,eventUrl,studentsData,h,slotHeights,baseSchedule);}} onResetHeights={handleResetHeights} baseSchedule={baseSchedule} onUpdateBaseSchedule={b=>{setBaseSchedule(b); if(isCloudLoaded)saveCloud(data,classes,title,eventUrl,studentsData,homeroomClass,slotHeights,b);}} />
                     <DailyReportModal isOpen={reportModal.isOpen} onClose={()=>setReportModal({isOpen: false, text: ''})} reportText={reportModal.text} />
                 </div>
